@@ -1,0 +1,37 @@
+{
+	auto_https off
+	admin off
+}
+:8080 {
+	encode zstd gzip
+
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000 {
+			transport http {
+				# Uvicornの5秒idleより先に接続を回収し、回答POSTの切断502を防ぐ。
+				keepalive 2s
+			}
+		}
+	}
+
+	@spa_entrypoints path / /operator /operator/ /moderator /moderator/
+	handle @spa_entrypoints {
+		root * /srv
+		rewrite * /index.html
+		file_server
+	}
+
+	handle /assets/* {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		respond 404
+	}
+}

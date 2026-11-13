@@ -1,0 +1,150 @@
+from __future__ import annotations
+
+from quiz_app.load_test.scenario import (
+    EXPECTED_FAULT_SCHEDULE,
+    EXPECTED_RAMP_TARGET_OFFSETS_SECONDS,
+    EXPECTED_RAMP_TARGETS,
+    EXPECTED_ROUND_CONTRACT,
+    OPTION_LABELS,
+    LoadTestAcceptanceThresholdsManifest,
+    LoadTestAnswerOracleManifest,
+    LoadTestFaultActionManifest,
+    LoadTestLifecycleManifest,
+    LoadTestOptionCountsManifest,
+    LoadTestProtocolManifest,
+    LoadTestResourceAbortManifest,
+    LoadTestRoundScenarioManifest,
+    LoadTestScenarioManifest,
+    LoadTestVirtualAnswerAssignmentManifest,
+)
+
+
+def build_fixed_scenario() -> LoadTestScenarioManifest:
+    """後続toolが同じ値を消費する承認済みscenario contractを構築する。"""
+
+    rounds = tuple(
+        LoadTestRoundScenarioManifest(
+            number=number,
+            start_offset_seconds=start_offset_seconds,
+            answer_population=answer_population,
+            virtual_answer_count=virtual_answer_count,
+            expected_option_counts=LoadTestOptionCountsManifest(
+                a=expected_option_counts[0],
+                b=expected_option_counts[1],
+                c=expected_option_counts[2],
+                d=expected_option_counts[3],
+            ),
+            replay=replay,
+            condition=condition,
+            receipt_discard_vu_start=receipt_discard_vu_start,
+            receipt_discard_vu_end=receipt_discard_vu_end,
+            receipt_discard_only_when_status=receipt_discard_only_when_status,
+            answer_status_delay_ms=answer_status_delay_ms,
+            retry_only_when_status=retry_only_when_status,
+        )
+        for (
+            number,
+            start_offset_seconds,
+            answer_population,
+            virtual_answer_count,
+            expected_option_counts,
+            replay,
+            condition,
+            receipt_discard_vu_start,
+            receipt_discard_vu_end,
+            receipt_discard_only_when_status,
+            answer_status_delay_ms,
+            retry_only_when_status,
+        ) in EXPECTED_ROUND_CONTRACT
+    )
+    faults = tuple(
+        LoadTestFaultActionManifest(
+            target=target,
+            action=action,
+            offset_seconds=offset_seconds,
+        )
+        for target, action, offset_seconds in EXPECTED_FAULT_SCHEDULE
+    )
+    return LoadTestScenarioManifest(
+        lifecycle=LoadTestLifecycleManifest(
+            virtual_sessions=600,
+            target_total_sessions=600,
+            ramp_start_seconds=0,
+            ramp_end_seconds=600,
+            ramp_targets=EXPECTED_RAMP_TARGETS,
+            ramp_target_offsets_seconds=EXPECTED_RAMP_TARGET_OFFSETS_SECONDS,
+            measurement_start_seconds=900,
+            measurement_end_seconds=4500,
+            ramp_down_start_seconds=4500,
+            ramp_down_end_seconds=4800,
+            exclusive_window_confirmation_required=True,
+        ),
+        answer_oracle=LoadTestAnswerOracleManifest(
+            modulo_vu_start=1,
+            modulo_vu_end=496,
+            modulo_option_cycle=OPTION_LABELS,
+            fixed_virtual_answers=(
+                LoadTestVirtualAnswerAssignmentManifest(vu_id=497, option="A"),
+                LoadTestVirtualAnswerAssignmentManifest(vu_id=498, option="A"),
+                LoadTestVirtualAnswerAssignmentManifest(vu_id=499, option="B"),
+                LoadTestVirtualAnswerAssignmentManifest(vu_id=500, option="C"),
+                LoadTestVirtualAnswerAssignmentManifest(vu_id=599, option="B"),
+                LoadTestVirtualAnswerAssignmentManifest(vu_id=600, option="C"),
+            ),
+            mixed_virtual_vu_end=498,
+            mixed_additional_vu_ids=(599, 600),
+            concentrated_virtual_vu_end=500,
+            non_answering_vu_start=501,
+            non_answering_vu_end=598,
+            expected_option_counts=LoadTestOptionCountsManifest(a=126, b=125, c=125, d=124),
+        ),
+        protocol=LoadTestProtocolManifest(
+            join_token_characters=43,
+            independent_cookie_jar_per_session=True,
+            independent_websocket_per_session=True,
+            heartbeat_interval_seconds=3,
+            clock_samples_per_sync=3,
+            clock_sync_interval_seconds=30,
+            clock_sample_timeout_ms=1000,
+            clock_sample_selection="shortest-rtt",
+            clock_sample_max_rtt_ms=500,
+            polling_interval_seconds=1,
+            websocket_reconnect_interval_seconds=5,
+            static_asset_fetches_per_session=1,
+            refetch_projection_after_invalidation=True,
+            send_readiness=True,
+            query_status_after_unknown_response=True,
+            client_answer_id_scheme="uuid5(run_id,question_id:vu_id)",
+        ),
+        thresholds=LoadTestAcceptanceThresholdsManifest(
+            sustained_total_sessions=600,
+            sustained_duration_seconds=3600,
+            normal_participant_websockets=600,
+            target_count=600,
+            normal_expected_ready_count=600,
+            ready_count_minimum=588,
+            asset_failure_maximum=11,
+            expected_answer_count=500,
+            round_start_width_max_ms=1000,
+            notification_refresh_over_one_second_maximum=5,
+            http_5xx_maximum=0,
+            recovery_seconds_maximum=120,
+            missed_rounds_maximum=0,
+            duplicate_answers_maximum=0,
+            misleading_successes_maximum=0,
+            unresolved_answers_maximum=0,
+            replay_same_answer_id_required=True,
+            replay_row_change_maximum=0,
+            latency_mode="first-run-calibration-only",
+            latency_report_statistics=("p50", "p95", "p99", "max"),
+            hard_latency_threshold_ms=None,
+        ),
+        resource_abort=LoadTestResourceAbortManifest(
+            generator_cpu_percent_over=80,
+            generator_memory_percent_over=80,
+            scheduler_lag_ms_over=50,
+            consecutive_seconds=30,
+        ),
+        rounds=rounds,
+        fault_schedule=faults,
+    )

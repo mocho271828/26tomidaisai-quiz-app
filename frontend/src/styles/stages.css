@@ -1,0 +1,332 @@
+.round-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* 待機の主役はサイン板（青い見出しの帯＋青2pxの外枠・影なし）。1画面に1つ */
+.quiz-waiting-stage {
+  display: grid;
+  width: min(100%, 54rem);
+  min-height: 32rem;
+  grid-template-rows: auto 1fr auto;
+  margin-inline: auto;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 2px solid var(--color-border-sign);
+  border-radius: var(--radius-block);
+}
+
+.waiting-stage-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-on-fill);
+  background: var(--color-bg-sign);
+}
+
+.waiting-stage-phase,
+.waiting-stage-auto {
+  display: inline-flex;
+  min-height: var(--tag-height);
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-bold);
+}
+
+.waiting-stage-phase {
+  font-family: var(--font-family-display);
+  font-size: var(--font-xl);
+  font-feature-settings: "palt";
+}
+
+.waiting-stage-auto {
+  font-size: var(--font-sm);
+}
+
+.waiting-stage-refresh-icon {
+  flex: 0 0 auto;
+  animation: spin 5s linear infinite;
+}
+
+.waiting-stage-main {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+}
+
+.waiting-stage-mascot {
+  display: grid;
+  justify-items: center;
+  align-self: end;
+}
+
+.waiting-stage-copy {
+  min-width: 0;
+}
+
+.waiting-stage-status {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-link);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.waiting-stage-copy h2 {
+  max-width: 34rem;
+  margin-bottom: var(--space-3);
+  font-size: var(--font-3xl);
+  line-height: var(--leading-display);
+}
+
+.waiting-stage-copy > p:last-child {
+  max-width: 37rem;
+  margin-bottom: 0;
+  line-height: var(--leading-body);
+}
+
+/* 回答開始までの秒数は「いま」を示す主役の数字 */
+.waiting-stage-countdown {
+  display: grid;
+  min-width: 8rem;
+  place-items: center;
+  align-content: center;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-accent);
+  border-block: 2px solid var(--color-graphic-now);
+  font-variant-numeric: tabular-nums;
+}
+
+.waiting-stage-countdown strong {
+  font-family: var(--font-family-numeral);
+  font-size: var(--font-5xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-numeral);
+}
+
+.waiting-stage-countdown span {
+  margin-top: var(--space-1);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.waiting-stage-footer {
+  display: flex;
+  min-height: var(--touch-min);
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-default);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-compact);
+}
+
+.waiting-stage-footer > svg {
+  flex: 0 0 auto;
+  color: var(--color-action-secondary);
+}
+
+.participant-result-stage {
+  width: min(100%, 52rem);
+  margin-inline: auto;
+  padding-bottom: var(--space-4);
+}
+
+/* 正誤は色だけでなく、アイコンと「正解／不正解／未回答」の文字で伝える */
+.score-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 0;
+  border-top: 2px solid var(--color-border-strong);
+  border-radius: 0;
+}
+
+.score-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.score-card .score-points {
+  font-family: var(--font-family-numeral);
+  font-size: var(--font-4xl);
+  line-height: var(--leading-display);
+}
+
+.score-label {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.outcome-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-3xl);
+  font-weight: var(--weight-heavy);
+}
+
+.outcome-message {
+  margin: 0;
+  line-height: var(--leading-body);
+}
+
+.correct-answer-callout {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-soft);
+  border-radius: var(--radius-block);
+}
+
+.correct-answer-callout > span {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.correct-answer-callout > strong {
+  overflow-wrap: anywhere;
+  font-size: var(--font-xl);
+  line-height: var(--leading-heading);
+}
+
+.outcome-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.outcome-meta small {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.outcome-correct {
+  color: var(--quiz-success-text);
+  border-top-color: var(--quiz-success-text);
+}
+
+.outcome-incorrect {
+  color: var(--color-text-danger);
+  border-top-color: var(--color-border-danger);
+}
+
+.outcome-unanswered {
+  color: var(--color-text-primary);
+  border-top-color: var(--color-border-strong);
+}
+
+.result-tabs {
+  width: min(100%, 54rem);
+  margin-inline: auto;
+}
+
+.result-tab-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.result-tab-list button {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.result-tab-list button[aria-selected="true"] {
+  color: var(--color-text-on-fill);
+  background: var(--color-action-secondary);
+  border-color: var(--color-action-secondary);
+  font-weight: var(--weight-bold);
+}
+
+.result-tab-list button:focus-visible,
+.result-tab-panel:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+.result-tab-panel > :first-child {
+  margin-top: 0;
+}
+
+.result-tab-panel > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 680px) {
+  .quiz-waiting-stage {
+    min-height: 34rem;
+  }
+
+  .waiting-stage-main {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: var(--space-4);
+    text-align: center;
+  }
+
+  .waiting-stage-mascot {
+    align-self: center;
+    order: 1;
+  }
+
+  .waiting-stage-mascot .tommy-mascot {
+    width: 8.5rem;
+  }
+
+  .waiting-stage-copy {
+    order: 3;
+  }
+
+  .waiting-stage-countdown {
+    order: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .score-card {
+    grid-template-columns: 1fr;
+  }
+
+  .score-copy {
+    width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  .quiz-waiting-stage {
+    min-height: calc(100svh - 7.6rem);
+  }
+
+  .waiting-stage-topline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+}

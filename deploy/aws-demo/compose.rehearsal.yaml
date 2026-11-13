@@ -1,0 +1,31 @@
+services:
+  api: &rehearsal-api
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    environment:
+      AWS_DEMO_ROUND_SCOPE: rehearsal-six-round
+      API_INSTANCE_ID: api-rehearsal
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_ROUND_BACKUP_HOST_DIRECTORY:?AWS_DEMO_ROUND_BACKUP_HOST_DIRECTORY must be explicit}
+        target: /var/lib/quiz-round-backups
+        bind:
+          create_host_path: false
+
+  api-secondary:
+    # baseの安全設定とrehearsalのbackup/writer設定を両APIへ同じように適用する。
+    <<: *rehearsal-api
+    extends:
+      file: compose.yaml
+      service: api
+    environment:
+      AWS_DEMO_ROUND_SCOPE: rehearsal-six-round
+      API_INSTANCE_ID: api-rehearsal-secondary
+
+  gateway:
+    entrypoint: ["caddy"]
+    command: ["run", "--config", "/etc/caddy/Caddyfile.multi-api", "--adapter", "caddyfile"]
+    depends_on:
+      api:
+        condition: service_healthy
+      api-secondary:
+        condition: service_healthy

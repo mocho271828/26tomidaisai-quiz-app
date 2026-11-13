@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 1s
+  scrape_timeout: 900ms
+  evaluation_interval: 1s
+
+scrape_configs:
+  - job_name: quiz-api
+    metrics_path: /internal/metrics
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          instance: api-primary
+      - targets: ["api-secondary:8000"]
+        labels:
+          instance: api-secondary
+
+  - job_name: quiz-gateway
+    static_configs:
+      - targets: ["gateway:2019"]
+
+  - job_name: quiz-postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: quiz-redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  - job_name: quiz-node
+    static_configs:
+      - targets: ["node-exporter:9100"]

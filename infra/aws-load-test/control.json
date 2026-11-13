@@ -1,0 +1,1012 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Independent disposable load-test cleanup guard; email contains only non-secret status.",
+  "Metadata": {
+    "NotificationEncryption": "No customer managed KMS key: topic publishes only non-secret aggregate status, and is IAM/TLS protected."
+  },
+  "Parameters": {
+    "Prefix": {
+      "Type": "String",
+      "AllowedPattern": "gs-lt-[0-9a-f]{32}"
+    },
+    "RunId": {
+      "Type": "String",
+      "AllowedPattern": "[0-9a-f-]{36}"
+    },
+    "ExpiresAt": {
+      "Type": "String"
+    },
+    "NotificationEmail": {
+      "Type": "String",
+      "NoEcho": true
+    },
+    "ScheduleAt": {
+      "Type": "String"
+    },
+    "DeadlineTargetInput": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "WorkerLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${Prefix}-cleanup"
+        },
+        "RetentionInDays": 1,
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "Topic": {
+      "Type": "AWS::SNS::Topic",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${Prefix}-notifications"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "Email": {
+      "Type": "AWS::SNS::Subscription",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Protocol": "email",
+        "Endpoint": {
+          "Ref": "NotificationEmail"
+        },
+        "TopicArn": {
+          "Ref": "Topic"
+        }
+      }
+    },
+    "DeadLetterQueue": {
+      "Type": "AWS::SQS::Queue",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${Prefix}-deadline-dlq"
+        },
+        "MessageRetentionPeriod": 86400,
+        "SqsManagedSseEnabled": true,
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "ScheduleGroup": {
+      "Type": "AWS::Scheduler::ScheduleGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Ref": "Prefix"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "WorkerRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "RunOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:GetCallerIdentity",
+                    "cloudformation:ListStacks",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:ListStackResources",
+                    "ec2:DescribeInstances",
+                    "ec2:DescribeVolumes",
+                    "ec2:DescribeSnapshots",
+                    "ec2:DescribeAddresses",
+                    "rds:DescribeDBInstances",
+                    "rds:DescribeDBSnapshots",
+                    "rds:DescribeDBInstanceAutomatedBackups",
+                    "rds:ListTagsForResource",
+                    "elasticache:DescribeReplicationGroups",
+                    "elasticache:DescribeSnapshots",
+                    "elasticache:ListTagsForResource",
+                    "ecr:DescribeRepositories",
+                    "ecr:ListTagsForResource",
+                    "secretsmanager:ListSecrets",
+                    "s3:ListAllMyBuckets",
+                    "logs:DescribeLogGroups",
+                    "ec2:DescribeImages",
+                    "ec2:DescribeVpcs",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeRouteTables",
+                    "ec2:DescribeInternetGateways"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:DeleteStack"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-workload/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Prefix}-cleanup:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:TerminateInstances",
+                    "ec2:DeleteVolume",
+                    "ec2:DeleteSnapshot",
+                    "ec2:DisassociateAddress",
+                    "ec2:ReleaseAddress",
+                    "ec2:DeregisterImage",
+                    "ec2:DeleteVpc",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:DeleteSubnet",
+                    "ec2:DeleteSecurityGroup",
+                    "ec2:DeleteRouteTable",
+                    "ec2:DisassociateRouteTable",
+                    "ec2:DetachInternetGateway",
+                    "ec2:DeleteInternetGateway"
+                  ],
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "ec2:ResourceTag/RunId": {
+                        "Ref": "RunId"
+                      },
+                      "ec2:ResourceTag/Project": "gs-app-tomidaisai"
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "rds:DeleteDBInstance",
+                    "rds:DeleteDBSnapshot"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:*:${Prefix}*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticache:DeleteReplicationGroup",
+                    "elasticache:DeleteSnapshot"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:elasticache:${AWS::Region}:${AWS::AccountId}:*:${Prefix}*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:DeleteRepository"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${Prefix}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:DeleteSecret"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Prefix}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket",
+                    "s3:ListBucketVersions",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:GetBucketTagging",
+                    "s3:DeleteBucket"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:::${Prefix}-${AWS::AccountId}"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:DeleteObject",
+                    "s3:DeleteObjectVersion",
+                    "s3:AbortMultipartUpload"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:::${Prefix}-${AWS::AccountId}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:DeleteLogGroup",
+                    "logs:ListTagsForResource"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/gs-loadtest/${Prefix}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "rds:DeleteDBInstanceAutomatedBackup"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:auto-backup:*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/Project": "gs-app-tomidaisai",
+                      "aws:ResourceTag/RunId": {
+                        "Ref": "RunId"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Sub": "${Prefix}-worker"
+        }
+      }
+    },
+    "StateRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "RunOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-cleanup"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "scheduler:DeleteSchedule",
+                    "scheduler:GetSchedule"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${Prefix}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:DeleteLogGroup"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Prefix}-cleanup:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:DescribeLogGroups"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:DeleteAlarms"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${Prefix}-deadline-dlq"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:DeleteQueue",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "DeadLetterQueue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "Topic"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:GetFunctionConfiguration",
+                    "lambda:DeleteFunction"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-cleanup"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:DescribeStacks"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${Prefix}-workload/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:ListStacks"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:DescribeAlarms"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Sub": "${Prefix}-state"
+        }
+      }
+    },
+    "StateMachine": {
+      "Type": "AWS::StepFunctions::StateMachine",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "StateMachineName": {
+          "Fn::Sub": "${Prefix}-cleanup"
+        },
+        "StateMachineType": "STANDARD",
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "StateRole",
+            "Arn"
+          ]
+        },
+        "LoggingConfiguration": {
+          "Level": "OFF",
+          "IncludeExecutionData": false
+        },
+        "DefinitionString": {
+          "Fn::Sub": [
+            "{\"Comment\":\"Run cleanup with 60 second checks, five minute checks after one hour, and a 24 hour maximum including final notification.\",\"StartAt\":\"Initialize\",\"TimeoutSeconds\":86400,\"States\":{\"Initialize\":{\"Type\":\"Pass\",\"Parameters\":{\"run.$\":\"$.run\",\"attempt\":0,\"workload_clean\":false,\"hour_notified\":false,\"notification_failed\":false},\"Next\":\"ResumePhase\"},\"ResumePhase\":{\"Type\":\"Choice\",\"Choices\":[{\"And\":[{\"Variable\":\"$.finalization_phase\",\"IsPresent\":true},{\"Variable\":\"$.finalization_phase\",\"StringEquals\":\"worker\"}],\"Next\":\"GuardDeleteWorker\"},{\"And\":[{\"Variable\":\"$.finalization_phase\",\"IsPresent\":true},{\"Variable\":\"$.finalization_phase\",\"StringEquals\":\"worker-drained\"}],\"Next\":\"GuardVerifyWorkerDrainedAbsent\"},{\"And\":[{\"Variable\":\"$.finalization_phase\",\"IsPresent\":true},{\"Variable\":\"$.finalization_phase\",\"StringEquals\":\"worker-drain\"}],\"Next\":\"GuardDrainWorker\"},{\"And\":[{\"Variable\":\"$.finalization_phase\",\"IsPresent\":true},{\"Variable\":\"$.finalization_phase\",\"StringEquals\":\"alarm\"}],\"Next\":\"GuardDeleteAlarm\"},{\"And\":[{\"Variable\":\"$.finalization_phase\",\"IsPresent\":true},{\"Variable\":\"$.finalization_phase\",\"StringEquals\":\"queue\"}],\"Next\":\"GuardDeleteQueue\"},{\"And\":[{\"Variable\":\"$.finalization_phase\",\"IsPresent\":true},{\"Variable\":\"$.finalization_phase\",\"StringEquals\":\"logs\"}],\"Next\":\"GuardDeleteLogs\"},{\"Variable\":\"$.workload_clean\",\"BooleanEquals\":true,\"Next\":\"GuardDeleteDeadline\"}],\"Default\":\"GuardLookupWorker\"},\"LookupWorker\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:lambda:getFunctionConfiguration\",\"Parameters\":{\"FunctionName\":\"${WorkerArn}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Lambda.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"GuardUnstartedStack\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"GuardCleanup\",\"ResultPath\":null},\"UnstartedStack\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:cloudformation:listStacks\",\"Parameters\":{},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"CheckUnstartedStack\",\"ResultPath\":\"$.workload_stacks\"},\"UnstartedStackNext\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:cloudformation:listStacks\",\"Parameters\":{\"NextToken.$\":\"$.workload_stacks.NextToken\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"CheckUnstartedStack\",\"ResultPath\":\"$.workload_stacks\"},\"CheckUnstartedStack\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $count($states.input.workload_stacks.StackSummaries[StackName = '${Prefix}-workload']) > 0 %}\",\"Next\":\"MissingWorker\"},{\"Condition\":\"{% $exists($states.input.workload_stacks.NextToken) %}\",\"Next\":\"GuardUnstartedStackNext\"}],\"Default\":\"EmptyWorkload\"},\"MissingWorker\":{\"Type\":\"Pass\",\"Result\":{\"Error\":\"CleanupWorkerMissingForExistingStack\"},\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"},\"EmptyWorkload\":{\"Type\":\"Pass\",\"Parameters\":{\"Payload\":{\"run_id.$\":\"$.run.run_id\",\"done\":true,\"observed_at.$\":\"$$.State.EnteredTime\",\"residuals\":[],\"stack_status\":\"NEVER_CREATED\"}},\"ResultPath\":\"$.observation\",\"Next\":\"MarkWorkloadClean\"},\"Cleanup\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::lambda:invoke\",\"Parameters\":{\"FunctionName\":\"${WorkerArn}\",\"Payload.$\":\"$.run\"},\"TimeoutSeconds\":130,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"Completed\",\"ResultPath\":\"$.observation\"},\"Completed\":{\"Type\":\"Choice\",\"Choices\":[{\"Variable\":\"$.observation.Payload.done\",\"BooleanEquals\":true,\"Next\":\"MarkWorkloadClean\"},{\"Variable\":\"$.observation.Payload.stack_status\",\"StringEquals\":\"DELETE_FAILED\",\"Next\":\"GuardNotifyRetry\"}],\"Default\":\"Increment\"},\"MarkWorkloadClean\":{\"Type\":\"Pass\",\"Result\":true,\"ResultPath\":\"$.workload_clean\",\"Next\":\"GuardDeleteDeadline\"},\"Increment\":{\"Type\":\"Pass\",\"QueryLanguage\":\"JSONata\",\"Output\":\"{% $merge([$states.input, {'attempt': $states.input.attempt + 1}]) %}\",\"Next\":\"RetryInterval\"},\"RetryInterval\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"},{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 3600000 and ($not($exists($states.input.hour_notified)) or $not($states.input.hour_notified)) %}\",\"Next\":\"GuardNotifyHour\"},{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) < 3600000 %}\",\"Next\":\"Wait\"}],\"Default\":\"SlowWait\"},\"Wait\":{\"Type\":\"Wait\",\"Seconds\":60,\"Next\":\"ResumePhase\"},\"SlowWait\":{\"Type\":\"Wait\",\"Seconds\":300,\"Next\":\"ResumePhase\"},\"DeleteDeadline\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:scheduler:deleteSchedule\",\"Parameters\":{\"Name\":\"${Prefix}-deadline\",\"GroupName\":\"${Prefix}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Scheduler.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"GuardVerifyDeadline\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"GuardVerifyDeadline\",\"ResultPath\":null},\"VerifyDeadline\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:scheduler:getSchedule\",\"Parameters\":{\"Name\":\"${Prefix}-deadline\",\"GroupName\":\"${Prefix}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Scheduler.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"MarkDeadlineDeleted\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"FinalizationResidual\",\"ResultPath\":null},\"DrainWorker\":{\"Type\":\"Wait\",\"Seconds\":600,\"Next\":\"MarkWorkerDrainElapsed\"},\"DeleteWorker\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:lambda:deleteFunction\",\"Parameters\":{\"FunctionName\":\"${WorkerArn}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Lambda.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"GuardVerifyWorkerAbsent\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"GuardVerifyWorkerAbsent\",\"ResultPath\":null},\"VerifyWorkerAbsent\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:lambda:getFunctionConfiguration\",\"Parameters\":{\"FunctionName\":\"${WorkerArn}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Lambda.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"MarkWorkerDeleted\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"FinalizationResidual\",\"ResultPath\":null},\"DeleteAlarm\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:cloudwatch:deleteAlarms\",\"Parameters\":{\"AlarmNames\":[\"${Prefix}-deadline-dlq\"]},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"GuardVerifyAlarm\",\"ResultPath\":null},\"VerifyAlarm\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:cloudwatch:describeAlarms\",\"Parameters\":{\"AlarmNames\":[\"${Prefix}-deadline-dlq\"],\"AlarmTypes\":[\"MetricAlarm\",\"CompositeAlarm\",\"LogAlarm\"]},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"AlarmsAbsent\",\"ResultPath\":\"$.alarms\"},\"AlarmsAbsent\":{\"Type\":\"Choice\",\"Choices\":[{\"Variable\":\"$.alarms.MetricAlarms[0]\",\"IsPresent\":true,\"Next\":\"FinalizationResidual\"},{\"Variable\":\"$.alarms.CompositeAlarms[0]\",\"IsPresent\":true,\"Next\":\"FinalizationResidual\"},{\"Variable\":\"$.alarms.LogAlarms[0]\",\"IsPresent\":true,\"Next\":\"FinalizationResidual\"},{\"Variable\":\"$.alarms.NextToken\",\"IsPresent\":true,\"Next\":\"FinalizationResidual\"}],\"Default\":\"MarkAlarmDeleted\"},\"DeleteQueue\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:sqs:deleteQueue\",\"Parameters\":{\"QueueUrl\":\"${QueueUrl}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Sqs.QueueDoesNotExistException\",\"Sqs.NonExistentQueueException\"],\"ResultPath\":null,\"Next\":\"GuardVerifyQueue\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"DrainQueue\",\"ResultPath\":null},\"DrainQueue\":{\"Type\":\"Wait\",\"Seconds\":60,\"Next\":\"GuardVerifyQueue\"},\"VerifyQueue\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:sqs:getQueueAttributes\",\"Parameters\":{\"QueueUrl\":\"${QueueUrl}\",\"AttributeNames\":[\"QueueArn\"]},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Sqs.QueueDoesNotExistException\",\"Sqs.NonExistentQueueException\"],\"ResultPath\":null,\"Next\":\"MarkQueueDeleted\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"FinalizationResidual\",\"ResultPath\":null},\"DeleteLogs\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:cloudwatchlogs:deleteLogGroup\",\"Parameters\":{\"LogGroupName\":\"/aws/lambda/${Prefix}-cleanup\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"CloudWatchLogs.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"GuardVerifyLogs\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"GuardVerifyLogs\",\"ResultPath\":null},\"VerifyLogs\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:cloudwatchlogs:describeLogGroups\",\"Parameters\":{\"LogGroupNamePrefix\":\"/aws/lambda/${Prefix}-cleanup\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"LogsAbsent\",\"ResultPath\":\"$.logs\"},\"LogsAbsent\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $count($states.input.logs.LogGroups[LogGroupName = '/aws/lambda/${Prefix}-cleanup']) > 0 %}\",\"Next\":\"FinalizationResidual\"}],\"Default\":\"BuildCompletionReport\"},\"FinalizationResidual\":{\"Type\":\"Pass\",\"Result\":{\"Error\":\"ControlResourceStillPresent\"},\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"},\"BuildCompletionReport\":{\"Type\":\"Pass\",\"Parameters\":{\"workload.$\":\"$.observation.Payload\",\"control_resources_absent\":true,\"notification_failed.$\":\"$.notification_failed\"},\"ResultPath\":\"$.completion\",\"Next\":\"GuardNotifySuccess\"},\"NotifyRetry\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::sns:publish\",\"Parameters\":{\"TopicArn\":\"${TopicArn}\",\"Subject\":\"AWS load test cleanup retry\",\"Message\":\"Cleanup encountered an error. Bounded retries continue; inspect this run in Step Functions.\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.ALL\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.notification_failure\",\"Next\":\"RememberNotificationFailure\"}],\"Next\":\"Increment\",\"ResultPath\":null},\"NotifyHour\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::sns:publish\",\"Parameters\":{\"TopicArn\":\"${TopicArn}\",\"Subject\":\"AWS load test cleanup still incomplete\",\"Message\":\"One hour has elapsed since cleanup started. Residual resources may incur charges. Retrying every five minutes for up to 24 hours.\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.ALL\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.notification_failure\",\"Next\":\"RememberHourNotificationFailure\"}],\"Next\":\"MarkHourNotified\",\"ResultPath\":null},\"NotifyFailure\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::sns:publish\",\"Parameters\":{\"TopicArn\":\"${TopicArn}\",\"Subject\":\"AWS load test cleanup requires action\",\"Message\":\"Cleanup could not verify absence of all run resources within its retry window. Remaining resources may continue to incur charges. Inspect Step Functions history.\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.ALL\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.notification_failure\",\"Next\":\"NotificationFailed\"}],\"Next\":\"Failure\",\"ResultPath\":null},\"NotifySuccess\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::sns:publish\",\"Parameters\":{\"TopicArn\":\"${TopicArn}\",\"Subject\":\"AWS load test cleanup complete\",\"Message.$\":\"States.JsonToString($.completion)\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.ALL\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.notification_failure\",\"Next\":\"RememberFinalNotificationFailure\"}],\"Next\":\"NotificationStatus\",\"ResultPath\":null},\"MarkHourNotified\":{\"Type\":\"Pass\",\"Result\":true,\"ResultPath\":\"$.hour_notified\",\"Next\":\"RetryInterval\"},\"RememberHourNotificationFailure\":{\"Type\":\"Pass\",\"Result\":true,\"ResultPath\":\"$.notification_failed\",\"Next\":\"MarkHourNotified\"},\"RememberNotificationFailure\":{\"Type\":\"Pass\",\"Result\":true,\"ResultPath\":\"$.notification_failed\",\"Next\":\"Increment\"},\"RememberFinalNotificationFailure\":{\"Type\":\"Pass\",\"Result\":true,\"ResultPath\":\"$.notification_failed\",\"Next\":\"NotifyFailure\"},\"NotificationStatus\":{\"Type\":\"Choice\",\"Choices\":[{\"Variable\":\"$.notification_failed\",\"BooleanEquals\":true,\"Next\":\"NotificationFailed\"}],\"Default\":\"Success\"},\"NotificationFailed\":{\"Type\":\"Fail\",\"Error\":\"CleanupNotificationFailed\",\"Cause\":\"Resource cleanup and notification outcomes are separate. Inspect the completion report and notification failures in execution history.\"},\"Failure\":{\"Type\":\"Fail\",\"Error\":\"CleanupNotVerified\"},\"Success\":{\"Type\":\"Succeed\"},\"GuardNotifyRetry\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"NotifyRetry\"},\"GuardNotifyHour\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"NotifyHour\"},\"GuardUnstartedStack\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"UnstartedStack\"},\"GuardVerifyDeadline\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"VerifyDeadline\"},\"GuardDeleteAlarm\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"DeleteAlarm\"},\"GuardCleanup\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"Cleanup\"},\"GuardDeleteWorker\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"DeleteWorker\"},\"GuardVerifyWorkerAbsent\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"VerifyWorkerAbsent\"},\"GuardVerifyAlarm\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"VerifyAlarm\"},\"GuardDeleteQueue\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"DeleteQueue\"},\"GuardNotifySuccess\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"NotifySuccess\"},\"GuardDeleteDeadline\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"DeleteDeadline\"},\"GuardLookupWorker\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"LookupWorker\"},\"GuardUnstartedStackNext\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"UnstartedStackNext\"},\"GuardVerifyQueue\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"VerifyQueue\"},\"GuardVerifyLogs\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"VerifyLogs\"},\"GuardDeleteLogs\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"DeleteLogs\"},\"MarkDeadlineDeleted\":{\"Type\":\"Pass\",\"Result\":\"worker\",\"ResultPath\":\"$.finalization_phase\",\"Next\":\"GuardDeleteWorker\"},\"MarkWorkerDeleted\":{\"Type\":\"Pass\",\"Result\":\"worker-drain\",\"ResultPath\":\"$.finalization_phase\",\"Next\":\"GuardDrainWorker\"},\"MarkAlarmDeleted\":{\"Type\":\"Pass\",\"Result\":\"queue\",\"ResultPath\":\"$.finalization_phase\",\"Next\":\"GuardDeleteQueue\"},\"MarkQueueDeleted\":{\"Type\":\"Pass\",\"Result\":\"logs\",\"ResultPath\":\"$.finalization_phase\",\"Next\":\"GuardDeleteLogs\"},\"GuardDrainWorker\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85200000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"DrainWorker\"},\"MarkWorkerDrainElapsed\":{\"Type\":\"Pass\",\"Result\":\"worker-drained\",\"ResultPath\":\"$.finalization_phase\",\"Next\":\"GuardVerifyWorkerDrainedAbsent\"},\"GuardVerifyWorkerDrainedAbsent\":{\"Type\":\"Choice\",\"QueryLanguage\":\"JSONata\",\"Choices\":[{\"Condition\":\"{% $millis() - $toMillis($states.context.Execution.StartTime) >= 85800000 %}\",\"Next\":\"NotifyFailure\"}],\"Default\":\"VerifyWorkerDrainedAbsent\"},\"VerifyWorkerDrainedAbsent\":{\"Type\":\"Task\",\"Resource\":\"arn:aws:states:::aws-sdk:lambda:getFunctionConfiguration\",\"Parameters\":{\"FunctionName\":\"${WorkerArn}\"},\"TimeoutSeconds\":30,\"Retry\":[{\"ErrorEquals\":[\"States.Timeout\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\",\"Lambda.TooManyRequestsException\",\"Scheduler.ThrottlingException\",\"Scheduler.InternalServerException\",\"Sqs.RequestThrottledException\",\"CloudWatchLogs.ServiceUnavailableException\"],\"IntervalSeconds\":2,\"BackoffRate\":2,\"MaxAttempts\":2,\"MaxDelaySeconds\":15,\"JitterStrategy\":\"FULL\"}],\"Catch\":[{\"ErrorEquals\":[\"Lambda.ResourceNotFoundException\"],\"ResultPath\":null,\"Next\":\"MarkWorkerDrained\"},{\"ErrorEquals\":[\"States.ALL\"],\"ResultPath\":\"$.failure\",\"Next\":\"GuardNotifyRetry\"}],\"Next\":\"FinalizationResidual\",\"ResultPath\":null},\"MarkWorkerDrained\":{\"Type\":\"Pass\",\"Result\":\"alarm\",\"ResultPath\":\"$.finalization_phase\",\"Next\":\"GuardDeleteAlarm\"}}}",
+            {
+              "WorkerArn": {
+                "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-cleanup"
+              },
+              "QueueUrl": {
+                "Ref": "DeadLetterQueue"
+              },
+              "TopicArn": {
+                "Ref": "Topic"
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "SchedulerRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "RunOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution"
+                  ],
+                  "Resource": {
+                    "Ref": "StateMachine"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "DeadLetterQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Sub": "${Prefix}-scheduler"
+        }
+      }
+    },
+    "Deadline": {
+      "Type": "AWS::Scheduler::Schedule",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}-deadline"
+        },
+        "GroupName": {
+          "Ref": "ScheduleGroup"
+        },
+        "ScheduleExpression": {
+          "Ref": "ScheduleAt"
+        },
+        "ScheduleExpressionTimezone": "UTC",
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "State": "ENABLED",
+        "Target": {
+          "Arn": "arn:aws:scheduler:::aws-sdk:sfn:startExecution",
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "SchedulerRole",
+              "Arn"
+            ]
+          },
+          "Input": {
+            "Ref": "DeadlineTargetInput"
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 20
+          },
+          "DeadLetterConfig": {
+            "Arn": {
+              "Fn::GetAtt": [
+                "DeadLetterQueue",
+                "Arn"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "FailureRule": {
+      "Type": "AWS::Events::Rule",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}-cleanup-failed"
+        },
+        "EventPattern": {
+          "source": [
+            "aws.states"
+          ],
+          "detail-type": [
+            "Step Functions Execution Status Change"
+          ],
+          "detail": {
+            "stateMachineArn": [
+              {
+                "Ref": "StateMachine"
+              }
+            ],
+            "status": [
+              "FAILED",
+              "TIMED_OUT",
+              "ABORTED"
+            ]
+          }
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Id": "Email",
+            "Arn": {
+              "Ref": "Topic"
+            },
+            "Input": {
+              "Fn::Sub": "{\"run_id\":\"${RunId}\",\"status\":\"cleanup_failed\",\"action\":\"Inspect Step Functions and remaining AWS resources\"}"
+            }
+          }
+        ],
+        "Description": "Execution failure is observed independently from its own Catch handlers."
+      }
+    },
+    "TopicPolicy": {
+      "Type": "AWS::SNS::TopicPolicy",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Topics": [
+          {
+            "Ref": "Topic"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com"
+              },
+              "Action": "sns:Publish",
+              "Resource": {
+                "Ref": "Topic"
+              },
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "FailureRule",
+                      "Arn"
+                    ]
+                  }
+                }
+              },
+              "Sid": "PublishCleanupFailures"
+            },
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudwatch.amazonaws.com"
+              },
+              "Action": "sns:Publish",
+              "Resource": {
+                "Ref": "Topic"
+              },
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              },
+              "Sid": "PublishDeadlineAlarm"
+            }
+          ]
+        }
+      }
+    },
+    "RunDocument": {
+      "Type": "AWS::SSM::Document",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}-run"
+        },
+        "DocumentType": "Command",
+        "DocumentFormat": "JSON",
+        "Content": {
+          "schemaVersion": "2.2",
+          "description": "Run the reviewed load-test orchestrator; schema application is never performed here.",
+          "mainSteps": [
+            {
+              "action": "aws:runShellScript",
+              "name": "Run",
+              "inputs": {
+                "timeoutSeconds": "10800",
+                "runCommand": [
+                  {
+                    "Fn::Sub": "/usr/sbin/runuser -u gsloadtest -- /usr/bin/env XDG_RUNTIME_DIR=/run/user/1001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus /opt/gs-loadtest/venv/bin/python -m quiz_app.load_test_orchestrator --run-directory /var/lib/gs-loadtest/${RunId}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "AppWorkerDocument": {
+      "Type": "AWS::SSM::Document",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}-app-worker"
+        },
+        "DocumentType": "Command",
+        "DocumentFormat": "JSON",
+        "Content": {
+          "schemaVersion": "2.2",
+          "description": "Only approved fault and metrics actions for this run.",
+          "parameters": {
+            "Action": {
+              "type": "String",
+              "allowedValues": [
+                "faults",
+                "export"
+              ],
+              "interpolationType": "ENV_VAR"
+            }
+          },
+          "mainSteps": [
+            {
+              "action": "aws:runShellScript",
+              "name": "AppWorker",
+              "inputs": {
+                "timeoutSeconds": "10800",
+                "runCommand": [
+                  {
+                    "Fn::Sub": "/usr/sbin/runuser -u gsloadtest -- /usr/bin/env XDG_RUNTIME_DIR=/run/user/1001 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus /opt/gs-loadtest/venv/bin/python -m quiz_app.load_test_app_worker --run-directory /var/lib/gs-loadtest/${RunId} --action \"$SSM_Action\""
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "StateMachineArn": {
+      "Description": "StateMachineArn",
+      "Value": {
+        "Ref": "StateMachine"
+      }
+    },
+    "NotificationTopicArn": {
+      "Description": "NotificationTopicArn",
+      "Value": {
+        "Ref": "Topic"
+      }
+    },
+    "WorkerRoleArn": {
+      "Description": "WorkerRoleArn",
+      "Value": {
+        "Fn::GetAtt": [
+          "WorkerRole",
+          "Arn"
+        ]
+      }
+    },
+    "WorkerFunctionName": {
+      "Description": "WorkerFunctionName",
+      "Value": {
+        "Fn::Sub": "${Prefix}-cleanup"
+      }
+    },
+    "RunDocumentName": {
+      "Description": "RunDocumentName",
+      "Value": {
+        "Ref": "RunDocument"
+      }
+    },
+    "SchedulerRoleArn": {
+      "Description": "SchedulerRoleArn",
+      "Value": {
+        "Fn::GetAtt": [
+          "SchedulerRole",
+          "Arn"
+        ]
+      }
+    },
+    "DeadlineQueueArn": {
+      "Description": "DeadlineQueueArn",
+      "Value": {
+        "Fn::GetAtt": [
+          "DeadLetterQueue",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "run": {
+    "runId": "manual-050-a",
+    "sourceCommit": "0000000000000000000000000000000000000000",
+    "baseUrl": "https://127.0.0.1:8443",
+    "count": 1,
+    "ordinalStart": 1,
+    "startAt": "2026-10-02T00:00:00Z",
+    "durationSeconds": 900,
+    "joinSpreadMs": 0,
+    "operatorStartDelaySeconds": 45,
+    "preScheduleMarginMs": 5000,
+    "resultHoldMs": 5000,
+    "answerDelayMs": 500,
+    "scenario": "normal",
+    "faultAfterSeconds": 50,
+    "faultDurationMs": 2000,
+    "outputDirectory": "/absolute/path/to/new-run-parent",
+    "channel": "chromium",
+    "headless": true,
+    "identityKeyFile": "/absolute/private/path/identity.key"
+  },
+  "workerSize": 100,
+  "measurementLevel": "normal",
+  "detailedVuCount": 3,
+  "hostSampleIntervalMs": 3000,
+  "setupTimeoutSeconds": 900,
+  "operationTimeoutMs": 30000,
+  "manualParticipantCount": 1,
+  "expectedOperatorConnections": 1
+}

@@ -1,0 +1,77 @@
+/* 短い画面でも3列の比率を保ち、余白と文字を調整する。 */
+@media (max-height: 740px) {
+  .moderator-page { padding: 6px max(8px, var(--safe-area-right)) 6px max(8px, var(--safe-area-left)); }
+  .moderator-grid, .moderator-column { gap: 8px; }
+  .moderator-card { padding: 8px; }
+  .moderator-card h2 { margin-bottom: 5px; padding-bottom: 4px; font-size: 16px; }
+  .moderator-question-prompt { margin-bottom: 8px; font-size: clamp(15px, 5.5cqw, 22px); }
+  .moderator-options { gap: 6px; }
+  .moderator-options li { padding: 7px; font-size: clamp(12px, 4.8cqw, 18px); }
+  .moderator-time-summary { margin-bottom: 4px; }
+  .moderator-time-summary dd { font-size: clamp(11px, 4.5cqw, 16px); }
+  .moderator-distribution-rows { gap: 5px; }
+  .moderator-ranking-table { font-size: 16px; }
+  .moderator-ranking-table th, .moderator-ranking-table td { padding-block: 3px; }
+  .moderator-winner-details dd { margin-top: 0; font-size: clamp(14px, 5.5cqw, 20px); }
+}
+@media (max-width: 850px) {
+  .moderator-header p { display: none; }
+  .moderator-header .festival-logo { width: 90px; }
+  .moderator-card { padding: 8px; }
+  .moderator-time-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .moderator-winner-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .moderator-winner-details > div:first-child { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; }
+}
+@media (max-height: 540px) {
+  .moderator-container { gap: 4px; }
+  .moderator-header { padding-bottom: 2px; }
+  .moderator-card { padding: 4px; }
+  .moderator-card h2 { font-size: 13px; margin-bottom: 3px; padding-bottom: 2px; }
+  .moderator-question-prompt { font-size: 13px; line-height: 1.3; }
+  .moderator-options { gap: 4px; }
+  .moderator-options li { padding: 4px; gap: 4px; font-size: 11px; }
+  .moderator-options .moderator-option-label { width: 20px; height: 22px; font-size: 12px; }
+  .moderator-correct-option strong { font-size: 10px; }
+  .moderator-winner-details { grid-template-columns: .8fr 1fr 1fr; gap: 3px; }
+  .moderator-winner-details > div:first-child { grid-column: auto; display: block; }
+  .moderator-winner-details dt { font-size: 9px; }
+  .moderator-winner-details dd { font-size: 12px; }
+  .moderator-winner h2 small { font-size: 10px; }
+  .moderator-pagination { font-size: 10px; padding-top: 0; }
+  .moderator-pagination button { padding-inline: 4px; }
+  .moderator-time-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
+  .moderator-time-summary dt, .moderator-time-summary dd { font-size: 9px; }
+  .moderator-statistics-note, .moderator-result-note { font-size: 10px; margin-bottom: 2px; }
+  .moderator-distribution-rows { gap: 4px; }
+  .moderator-distribution-row { grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: 4px; }
+  .moderator-distribution-row .moderator-option-label { width: 20px; height: 20px; font-size: 11px; }
+  .moderator-distribution-count, .moderator-distribution-percentage { font-size: 10px; }
+  .moderator-ranking-table { font-size: 13px; }
+  .moderator-ranking-table th, .moderator-ranking-table td { padding: 2px; }
+  .moderator-ranking-table thead th { font-size: 10px; }
+  .moderator-preview-heading p, .moderator-preview-note { font-size: 9px; }
+}
+/* 通信断の案内で領域が短くなっても、指標とページ操作を枠内へ保つ。 */
+@container (max-height: 230px) {
+  .moderator-time-summary { margin-bottom: 2px; }
+  .moderator-time-summary dt, .moderator-time-summary dd { line-height: 1.2; }
+  .moderator-statistics-note, .moderator-result-note { margin-bottom: 3px; line-height: 1.2; }
+  .moderator-distribution-rows { gap: 3px; }
+}
+@container (max-height: 125px) {
+  .moderator-winner-details dt { line-height: 1.1; font-size: 10px; }
+  .moderator-winner-details dd { margin-top: 0; font-size: 14px; line-height: 1.2; }
+  #moderator-winner-title { margin-bottom: 3px; padding-bottom: 2px; font-size: 13px; line-height: 1.1; }
+  #moderator-winner-title small { font-size: 10px; }
+}
+@container (max-height: 95px) {
+  #moderator-winner-title { border: 0; margin-bottom: 2px; padding: 0; font-size: 11px; }
+  #moderator-winner-title small { font-size: 9px; }
+  .moderator-winner-details dt { font-size: 9px; }
+  .moderator-winner-details dd { font-size: 11px; }
+}
+@container (max-height: 340px) {
+  .moderator-question-prompt { font-size: 12px; line-height: 1.25; margin-bottom: 4px; }
+  .moderator-options { gap: 3px; }
+  .moderator-options li { font-size: 10px; line-height: 1.25; padding: 3px; }
+}

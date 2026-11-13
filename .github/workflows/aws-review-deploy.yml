@@ -1,0 +1,166 @@
+name: AWS Review Deploy
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deployment_mode:
+        description: update は既存環境、create は新規環境を対象にし、どちらもDBを初期化
+        type: choice
+        required: true
+        default: update
+        options: [update, create]
+      app_instance_type:
+        description: アプリEC2の型（800 VU検証はCPU credit制限のないc7i.xlarge）
+        type: choice
+        required: true
+        default: c7i.xlarge
+        options:
+          - c7i.xlarge
+          - t3.medium
+      public_entrypoint:
+        description: 公開入口（CloudFront標準URLは独自ドメイン・ACM設定を使用しない）
+        type: choice
+        required: true
+        default: custom-domain
+        options:
+          - custom-domain
+          - cloudfront
+
+permissions:
+  contents: read
+
+env:
+  AWS_REVIEW_REPOSITORY: ${{ vars.AWS_REVIEW_REPOSITORY }}
+  AWS_REVIEW_OPERATOR: ${{ vars.AWS_REVIEW_OPERATOR }}
+
+jobs:
+  json-check:
+    name: 問題・設定JSONを検証
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+          enable-cache: false
+      - name: 固定済み依存をインストール
+        run: uv sync --frozen --no-dev --project backend
+      - name: DB・AWSへ接続せずJSONを検証
+        run: uv run --no-sync --project backend python -m validation.github_json_check
+
+  authorize:
+    name: 手動配置の実行者・ブランチを確認
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: 所有者によるmainからの実行だけ許可
+        shell: bash
+        run: |
+          if [[ -z "$AWS_REVIEW_REPOSITORY" || -z "$AWS_REVIEW_OPERATOR" ||
+                "$GITHUB_REPOSITORY" != "$AWS_REVIEW_REPOSITORY" ||
+                "$GITHUB_REF" != "refs/heads/main" ||
+                "$GITHUB_ACTOR" != "$AWS_REVIEW_OPERATOR" ||
+                "$GITHUB_TRIGGERING_ACTOR" != "$AWS_REVIEW_OPERATOR" ]]; then
+            echo "::error::AWS操作は設定したリポジトリの main から、指定した運営担当者が実行・再実行した場合だけ許可されます。"
+            exit 1
+          fi
+
+  deploy:
+    name: AWS確認環境を作成またはDBを初期化して更新
+    if: github.event_name == 'workflow_dispatch'
+    needs: [json-check, authorize]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    environment: aws-review
+    concurrency:
+      group: aws-review
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-northeast-1
+      AWS_DEFAULT_REGION: ap-northeast-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REVIEW_ID: ${{ secrets.AWS_REVIEW_ID }}
+      AWS_APP_AZ: ${{ secrets.AWS_APP_AZ }}
+      AWS_SECONDARY_AZ: ${{ secrets.AWS_SECONDARY_AZ }}
+      AWS_UBUNTU_AMI_ID: ${{ secrets.AWS_UBUNTU_AMI_ID }}
+      AWS_DATABASE_ENGINE_VERSION: ${{ secrets.AWS_DATABASE_ENGINE_VERSION }}
+      AWS_REVIEW_DEPLOYMENT_MODE: ${{ inputs.deployment_mode || 'update' }}
+      AWS_APP_INSTANCE_TYPE: ${{ inputs.app_instance_type || 'c7i.xlarge' }}
+      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      AWS_REVIEW_PUBLIC_ENTRYPOINT: ${{ inputs.public_entrypoint || 'custom-domain' }}
+      AWS_REVIEW_CERTIFICATE_ARN: ${{ secrets.AWS_REVIEW_CERTIFICATE_ARN }}
+      AWS_REVIEW_DOMAIN_NAME: ${{ vars.AWS_REVIEW_DOMAIN_NAME }}
+      VITE_EVENT_START_AT: ${{ vars.VITE_EVENT_START_AT }}
+      VITE_SURVEY_URL: ${{ vars.VITE_SURVEY_URL }}
+      VITE_HOME_URL: ${{ vars.VITE_HOME_URL }}
+    steps:
+      - name: 必須Environment secretsを確認
+        shell: bash
+        run: |
+          for variable in AWS_ACCOUNT_ID AWS_REVIEW_ID AWS_APP_AZ AWS_SECONDARY_AZ AWS_UBUNTU_AMI_ID AWS_DATABASE_ENGINE_VERSION AWS_DEPLOY_ROLE_ARN; do
+            if [[ -z "${!variable}" ]]; then
+              echo "::error::Environment aws-review の Secrets に ${variable} を設定してください。"
+              exit 1
+            fi
+          done
+          export LC_ALL=C
+          if [[ ! "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
+            echo "::error::Environment aws-review の Secret AWS_ACCOUNT_ID は半角数字12桁で設定してください。"
+            exit 1
+          fi
+          # macOSでの回帰検証にも使えるよう、pathの上限510文字を255文字ずつに分ける。
+          role_arn_pattern="^arn:aws:iam::${AWS_ACCOUNT_ID}:role/([!-~]{0,255}[!-~]{1,255}/)?[A-Za-z0-9_+=,.@-]{1,64}$"
+          if [[ ! "$AWS_DEPLOY_ROLE_ARN" =~ $role_arn_pattern ]]; then
+            echo "::error::Secret AWS_DEPLOY_ROLE_ARN の形式またはaccountが不正です。CloudFormationのDeployRoleArnを、引用符・空白・改行なしで登録し、AWS_ACCOUNT_IDとの一致を確認してください。"
+            exit 1
+          fi
+          case "$AWS_REVIEW_PUBLIC_ENTRYPOINT" in
+            custom-domain)
+              domain_pattern='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
+              if [[ ! "$AWS_REVIEW_DOMAIN_NAME" =~ $domain_pattern || ${#AWS_REVIEW_DOMAIN_NAME} -gt 253 ]]; then
+                echo "::error::Environment aws-review の Variable AWS_REVIEW_DOMAIN_NAME を、証明書の対象となる小文字のDNSホスト名で設定してください。"
+                exit 1
+              fi
+              certificate_arn_pattern="^arn:aws:acm:us-east-1:${AWS_ACCOUNT_ID}:certificate/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              if [[ ! "$AWS_REVIEW_CERTIFICATE_ARN" =~ $certificate_arn_pattern ]]; then
+                echo "::error::Secret AWS_REVIEW_CERTIFICATE_ARN は同一account・us-east-1のACM証明書ARNにしてください。"
+                exit 1
+              fi
+              ;;
+            cloudfront) ;;
+            *)
+              echo "::error::AWS_REVIEW_PUBLIC_ENTRYPOINT は workflow の公開入口から選択してください。"
+              exit 1
+              ;;
+          esac
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+          enable-cache: false
+      - name: 固定済み依存をインストール
+        run: uv sync --frozen --no-dev --project backend
+      - name: OIDCで配置roleを引き受ける
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-1
+          role-duration-seconds: 10800
+          role-session-name: review-deploy-${{ github.run_id }}-${{ github.run_attempt }}
+          unset-current-credentials: true
+      - name: 専用環境を作成またはDBを初期化して更新
+        run: uv run --no-sync --project backend python -m validation.aws_review deploy

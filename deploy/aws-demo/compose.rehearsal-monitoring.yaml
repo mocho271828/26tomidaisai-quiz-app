@@ -1,0 +1,9 @@
+# AWS Dashboard 用の host collector から、固定の loopback port だけで採取する。
+services:
+  api:
+    ports:
+      - "127.0.0.1:18001:8000"
+
+  api-secondary:
+    ports:
+      - "127.0.0.1:18002:8000"

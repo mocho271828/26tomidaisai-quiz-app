@@ -1,0 +1,59 @@
+# compose.yaml と併用する。schema/seedは適用しない。
+services:
+  postgres:
+    entrypoint: ["sh", "/opt/local-tls/postgres-start.sh"]
+    volumes:
+      - ${LOCAL_TLS_CERT_DIRECTORY:?certificate directory required}/postgres:/run/tls:ro
+      - ./infra/local-tls/postgres-start.sh:/opt/local-tls/postgres-start.sh:ro
+    tmpfs:
+      - /run/postgres-tls
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=$${POSTGRES_PASSWORD} PGSSLMODE=verify-full PGSSLROOTCERT=/run/tls/ca.crt psql -h postgres -U $${POSTGRES_USER} -d $${POSTGRES_DB} -Atqc 'SELECT 1' >/dev/null"]
+  redis:
+    entrypoint: ["sh", "/opt/local-tls/redis-start.sh"]
+    environment:
+      REDIS_PASSWORD: ${LOCAL_TLS_REDIS_PASSWORD:?local Redis AUTH required}
+    volumes:
+      - ${LOCAL_TLS_CERT_DIRECTORY:?}/redis:/run/tls:ro
+      - ./infra/local-tls/redis-start.sh:/opt/local-tls/redis-start.sh:ro
+    tmpfs:
+      - /run/redis-tls
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$${REDIS_PASSWORD} redis-cli --tls --cacert /run/tls/ca.crt --sni redis -h redis ping | grep -qx PONG"]
+  api:
+    entrypoint: ["sh", "/opt/local-tls/api-start.sh"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://quiz:${POSTGRES_PASSWORD:?local DB credential required}@postgres:5432/quiz_demo
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/local-ca/ca.crt
+      REDIS_URL: rediss://:${LOCAL_TLS_REDIS_PASSWORD:?}@redis:6379/0
+      SSL_CERT_FILE: /run/quiz-tls/system-plus-local-ca.pem
+      SESSION_COOKIE_SECURE: "true"
+      REALTIME_ALLOWED_ORIGINS: ${LOCAL_TLS_ALLOWED_ORIGINS:?exact HTTPS origins required}
+      ENABLE_DEMO_SEED: "false"
+    volumes:
+      - ${LOCAL_TLS_CERT_DIRECTORY:?}/ca.crt:/run/local-ca/ca.crt:ro
+      - ./infra/local-tls/api-start.sh:/opt/local-tls/api-start.sh:ro
+    tmpfs:
+      - /run/quiz-tls
+    depends_on:
+      redis:
+        condition: service_healthy
+  gateway:
+    ports: !override
+      - "${LOCAL_TLS_BIND_ADDRESS:-127.0.0.1}:${LOCAL_TLS_PORT:-8443}:8443"
+    volumes:
+      - ./infra/local-tls/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${LOCAL_TLS_CERT_DIRECTORY:?}/gateway:/run/tls:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--cacert", "/run/tls/ca.crt", "https://localhost:8443/api/health/live"]
+  migrate:
+    entrypoint: ["sh", "-c", "echo local_tls_manual_schema_only >&2; exit 64"]
+  seed:
+    entrypoint: ["sh", "-c", "echo local_tls_manual_seed_only >&2; exit 64"]
+  acceptance:
+    entrypoint: ["sh", "-c", "echo use_independent_browser_runner >&2; exit 64"]
+volumes:
+  postgres-data:
+    external: true
+    name: ${LOCAL_TLS_POSTGRES_VOLUME:?existing dedicated PostgreSQL volume required}

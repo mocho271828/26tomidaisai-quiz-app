@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: One-time GitHub OIDC roles for the dedicated manually operated review environment.
+
+Parameters:
+  DemoId:
+    Type: String
+    MaxLength: 21
+    AllowedPattern: '[a-z0-9]+(-[a-z0-9]+)*'
+  GitHubOidcProviderArn:
+    Type: String
+    AllowedPattern: 'arn:aws:iam::[0-9]{12}:oidc-provider/token.actions.githubusercontent.com'
+  GitHubSubject:
+    Type: String
+    # GitHubのimmutable subjectにも対応し、他repository・Environmentは許可しない。
+    AllowedPattern: 'repo:[A-Za-z0-9-]+(@[0-9]+)?/[A-Za-z0-9_.-]+(@[0-9]+)?:environment:aws-review'
+  ReviewCertificateArn:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    Description: Existing review certificate to inspect; update this bootstrap stack before deploy.
+
+Conditions:
+  HasReviewCertificate: !Not [!Equals [!Ref ReviewCertificateArn, '']]
+
+Resources:
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      MaxSessionDuration: 10800
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Federated: !Ref GitHubOidcProviderArn}
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Ref GitHubSubject
+      Policies:
+        - PolicyName: DeployDedicatedReview
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # 共有証明書の発行・更新・削除権限を与えず、Deployの事前確認だけを許可する。
+              - !If
+                - HasReviewCertificate
+                - Effect: Allow
+                  Action: acm:DescribeCertificate
+                  Resource: !Ref ReviewCertificateArn
+                - !Ref 'AWS::NoValue'
+              - Effect: Allow
+                Action: [cloudformation:CreateChangeSet, cloudformation:ExecuteChangeSet, cloudformation:DeleteChangeSet, cloudformation:DescribeChangeSet]
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:ap-northeast-1:${AWS::AccountId}:stack/gs-rehearsal-${DemoId}-*/*'
+                  - !Sub 'arn:aws:cloudformation:ap-northeast-1:${AWS::AccountId}:changeSet/review-*/*'
+              - Effect: Allow
+                Action: [iam:CreateRole, iam:PutRolePolicy, iam:TagRole, iam:UntagRole, iam:UpdateAssumeRolePolicy]
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/gs-review-${DemoId}-cfn'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/gs-review-${DemoId}-cleanup'
+              - Effect: Allow
+                Action: [s3:CreateBucket, s3:PutBucketPolicy, s3:PutBucketPublicAccessBlock, s3:PutBucketOwnershipControls, s3:PutEncryptionConfiguration, s3:PutBucketTagging]
+                Resource: !Sub 'arn:aws:s3:::gs-review-${DemoId}-${AWS::AccountId}'
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub 'arn:aws:s3:::gs-review-${DemoId}-${AWS::AccountId}/*'
+              - Effect: Allow
+                Action: [states:CreateStateMachine, states:UpdateStateMachine, states:TagResource, states:UntagResource]
+                Resource: !Sub 'arn:aws:states:ap-northeast-1:${AWS::AccountId}:stateMachine:gs-rehearsal-${DemoId}-cleanup'
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload, ecr:PutImage]
+                Resource: !Sub 'arn:aws:ecr:ap-northeast-1:${AWS::AccountId}:repository/gs-rehearsal-${DemoId}/*'
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource: arn:aws:ssm:ap-northeast-1::document/AWS-RunShellScript
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:aws:ec2:ap-northeast-1:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/DemoId: !Ref DemoId
+                    ssm:resourceTag/Purpose: quiz-rehearsal
+              - Effect: Allow
+                Action: [ssm:GetCommandInvocation, ssm:CancelCommand, ssm:DescribeInstanceInformation]
+                Resource: '*'
+
+  DestroyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      MaxSessionDuration: 10800
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Federated: !Ref GitHubOidcProviderArn}
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Ref GitHubSubject
+
+  ReadAndCleanupPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Roles: [!Ref DeployRole, !Ref DestroyRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # 一覧APIのResource指定非対応を許容し、破壊操作は以下の専用ARN/tagへ分離する。
+          - Sid: ResourceInventory
+            Effect: Allow
+            Action:
+              - sts:GetCallerIdentity
+              - cloudformation:DescribeStacks
+              - cloudformation:ListStacks
+              - cloudformation:ListStackResources
+              - ec2:DescribeImages
+              - ec2:DescribeAvailabilityZones
+              - ec2:DescribeManagedPrefixLists
+              - ec2:DescribeInstances
+              - ec2:DescribeVolumes
+              - ec2:DescribeSnapshots
+              - ec2:DescribeAddresses
+              - ec2:DescribeNatGateways
+              - ec2:DescribeVpcs
+              - ec2:DescribeSubnets
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeRouteTables
+              - ec2:DescribeInternetGateways
+              - rds:DescribeOrderableDBInstanceOptions
+              - rds:DescribeDBInstances
+              - rds:DescribeDBSnapshots
+              - rds:DescribeDBInstanceAutomatedBackups
+              - rds:DescribeDBSubnetGroups
+              - elasticache:DescribeReplicationGroups
+              - elasticache:DescribeCacheClusters
+              - elasticache:DescribeSnapshots
+              - elasticache:DescribeCacheSubnetGroups
+              - ecr:DescribeRepositories
+              - ecr:DescribeImages
+              - secretsmanager:ListSecrets
+              - logs:DescribeLogGroups
+              - tag:GetResources
+            Resource: '*'
+          - Effect: Allow
+            Action: rds:ListTagsForResource
+            Resource: !Sub 'arn:aws:rds:ap-northeast-1:${AWS::AccountId}:*'
+          - Effect: Allow
+            Action: elasticache:ListTagsForResource
+            Resource: !Sub 'arn:aws:elasticache:ap-northeast-1:${AWS::AccountId}:*'
+          - Effect: Allow
+            Action: [s3:GetObject, s3:PutObject]
+            Resource: !Sub 'arn:aws:s3:::gs-review-${DemoId}-${AWS::AccountId}/review-destroy-ledger.json'
+          - Effect: Allow
+            Action: cloudformation:DeleteStack
+            Resource: !Sub 'arn:aws:cloudformation:ap-northeast-1:${AWS::AccountId}:stack/gs-rehearsal-${DemoId}-*/*'
+          - Effect: Allow
+            Action: [iam:GetRole, iam:ListRolePolicies, iam:ListAttachedRolePolicies, iam:ListRoleTags, iam:GetRolePolicy, iam:DeleteRolePolicy, iam:DeleteRole, iam:GetInstanceProfile, iam:ListInstanceProfileTags]
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/gs-review-${DemoId}-*'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/gs-review-${DemoId}-app'
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/gs-review-${DemoId}-cfn'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/gs-review-${DemoId}-cleanup'
+            Condition:
+              StringEquals:
+                iam:PassedToService: [cloudformation.amazonaws.com, states.amazonaws.com]
+          - Effect: Allow
+            Action: [states:DescribeStateMachine, states:ListTagsForResource, states:DeleteStateMachine]
+            Resource: !Sub 'arn:aws:states:ap-northeast-1:${AWS::AccountId}:stateMachine:gs-rehearsal-${DemoId}-cleanup'
+          - Effect: Allow
+            Action: [scheduler:GetSchedule, scheduler:DeleteSchedule]
+            Resource: !Sub 'arn:aws:scheduler:ap-northeast-1:${AWS::AccountId}:schedule/default/gs-rehearsal-${DemoId}-deadline'
+          - Effect: Allow
+            Action: [s3:GetBucketTagging, s3:GetBucketLocation, s3:GetBucketPolicy, s3:GetBucketPublicAccessBlock, s3:GetBucketOwnershipControls, s3:GetEncryptionConfiguration, s3:GetBucketVersioning, s3:ListBucket, s3:ListBucketVersions, s3:ListBucketMultipartUploads, s3:DeleteBucketPolicy, s3:DeleteBucket]
+            Resource: !Sub 'arn:aws:s3:::gs-review-${DemoId}-${AWS::AccountId}'
+          - Effect: Allow
+            Action: [s3:DeleteObject, s3:DeleteObjectVersion, s3:AbortMultipartUpload]
+            Resource: !Sub 'arn:aws:s3:::gs-review-${DemoId}-${AWS::AccountId}/*'
+          - Effect: Allow
+            Action: [ec2:StopInstances, ec2:TerminateInstances, ec2:DeleteVolume, ec2:DeleteSnapshot]
+            Resource: !Sub 'arn:aws:ec2:ap-northeast-1:${AWS::AccountId}:*/*'
+            Condition:
+              StringEquals: {ec2:ResourceTag/DemoId: !Ref DemoId}
+          - Effect: Allow
+            Action: rds:DeleteDBSnapshot
+            Resource: !Sub 'arn:aws:rds:ap-northeast-1:${AWS::AccountId}:*'
+            Condition:
+              StringEquals: {aws:ResourceTag/DemoId: !Ref DemoId}
+          # このAPIに親DB条件がないため、CLI側の保存済みDbiResourceId一致を必須にする。
+          - Effect: Allow
+            Action: rds:DeleteDBInstanceAutomatedBackup
+            Resource: !Sub 'arn:aws:rds:ap-northeast-1:${AWS::AccountId}:auto-backup:*'
+          - Effect: Allow
+            Action: elasticache:DeleteSnapshot
+            Resource: !Sub 'arn:aws:elasticache:ap-northeast-1:${AWS::AccountId}:*'
+            Condition:
+              StringEquals: {aws:ResourceTag/DemoId: !Ref DemoId}
+          - Effect: Allow
+            Action: secretsmanager:DescribeSecret
+            Resource:
+              - !Sub 'arn:aws:secretsmanager:ap-northeast-1:${AWS::AccountId}:secret:gs-rehearsal-${DemoId}-*'
+              - !Sub 'arn:aws:secretsmanager:ap-northeast-1:${AWS::AccountId}:secret:rds!*'
+          - Effect: Allow
+            Action: cloudwatch:GetDashboard
+            Resource: !Sub 'arn:aws:cloudwatch::${AWS::AccountId}:dashboard/gs-rehearsal-${DemoId}-health'
+          - Effect: Allow
+            Action: [cloudfront:GetDistribution, cloudfront:GetVpcOrigin]
+            Resource:
+              - !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/*'
+              - !Sub 'arn:aws:cloudfront::${AWS::AccountId}:vpcorigin/*'
+
+Outputs:
+  DeployRoleArn:
+    Value: !GetAtt DeployRole.Arn
+  DestroyRoleArn:
+    Value: !GetAtt DestroyRole.Arn

@@ -1,0 +1,229 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Disabled-by-default CloudFront entry for the five-question rehearsal.
+
+Parameters:
+  DemoId:
+    Type: String
+    MinLength: 1
+    MaxLength: 32
+    AllowedPattern: '[a-z0-9][a-z0-9-]*'
+  MonitoringEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['false', 'true']
+  MonitoringInstanceId:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|i-[0-9a-f]{17}'
+  MonitoringDatabaseIdentifier:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|[a-zA-Z][a-zA-Z0-9-]{0,62}'
+  MonitoringRedisClusterId:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|[a-z][a-z0-9-]{0,49}'
+  OriginInstanceArn:
+    Type: String
+    AllowedPattern: 'arn:aws:ec2:ap-northeast-1:[0-9]{12}:instance/i-[0-9a-f]{17}'
+    Description: Running dedicated EC2 instance in a private subnet, without a public IP.
+  OriginPrivateDnsName:
+    Type: String
+    MinLength: 1
+    MaxLength: 253
+    AllowedPattern: '[a-z0-9][a-z0-9.-]*\.compute\.internal'
+    Description: PrivateDnsName read from the same EC2 instance.
+  OriginSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Dedicated SG attached to the origin instance; no internet ingress.
+  CloudFrontPrefixListId:
+    Type: String
+    AllowedPattern: 'pl-[0-9a-f]{8,17}'
+    Description: com.amazonaws.global.cloudfront.origin-facing in the origin region.
+  GatewayPort:
+    Type: Number
+    Default: 18080
+    MinValue: 1024
+    MaxValue: 65535
+  PublicEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['false', 'true']
+  ReviewDomainName:
+    Type: String
+    Default: ''
+    MaxLength: 253
+    AllowedPattern: '^$|^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
+    Description: Optional review domain; leave empty for the deadline-managed rehearsal.
+  ReviewCertificateArn:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    Description: Existing issued ACM certificate in this account; managed outside the review stacks.
+
+Conditions:
+  HasMonitoring: !Equals [!Ref MonitoringEnabled, 'true']
+  IsPublic: !Equals [!Ref PublicEnabled, 'true']
+  HasReviewDomain: !Not [!Equals [!Ref ReviewDomainName, '']]
+
+Rules:
+  MonitoringRequiresResourceIds:
+    RuleCondition: !Equals [!Ref MonitoringEnabled, 'true']
+    Assertions:
+      - Assert: !And
+          - !Not [!Equals [!Ref MonitoringInstanceId, '']]
+          - !Not [!Equals [!Ref MonitoringDatabaseIdentifier, '']]
+          - !Not [!Equals [!Ref MonitoringRedisClusterId, '']]
+        AssertDescription: Monitoring requires the current EC2, RDS, and cache cluster IDs.
+  ReviewDomainRequiresCertificate:
+    RuleCondition: !Not [!Equals [!Ref ReviewDomainName, '']]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref ReviewCertificateArn, '']]
+        AssertDescription: A review domain requires an existing us-east-1 ACM certificate.
+  DefaultDomainHasNoReviewCertificate:
+    RuleCondition: !Equals [!Ref ReviewDomainName, '']
+    Assertions:
+      - Assert: !Equals [!Ref ReviewCertificateArn, '']
+        AssertDescription: Leave both review domain and certificate empty for the default domain.
+
+Resources:
+  CloudFrontIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Description: CloudFront VPC origin to the rehearsal gateway only
+      GroupId: !Ref OriginSecurityGroupId
+      IpProtocol: tcp
+      FromPort: !Ref GatewayPort
+      ToPort: !Ref GatewayPort
+      SourcePrefixListId: !Ref CloudFrontPrefixListId
+
+  VpcOrigin:
+    Type: AWS::CloudFront::VpcOrigin
+    # 作成時に到達可能にし、削除時はoriginを除去してから受信ruleを削除する。
+    DependsOn: CloudFrontIngress
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcOriginEndpointConfig:
+        Name: !Sub '${AWS::StackName}-origin'
+        Arn: !Ref OriginInstanceArn
+        HTTPPort: !Ref GatewayPort
+        HTTPSPort: 443
+        OriginProtocolPolicy: http-only
+        OriginSSLProtocols: [TLSv1.2]
+      Tags:
+        - Key: DemoId
+          Value: !Ref DemoId
+        - Key: Purpose
+          Value: quiz-rehearsal
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DistributionConfig:
+        Comment: !Sub 'Five-question rehearsal ${DemoId}'
+        Enabled: !If [IsPublic, true, false]
+        HttpVersion: http2
+        IPV6Enabled: true
+        Aliases: !If [HasReviewDomain, [!Ref ReviewDomainName], !Ref 'AWS::NoValue']
+        # 証明書は短命な確認環境と分離して保持し、CloudFront側だけへ関連付ける。
+        ViewerCertificate: !If
+          - HasReviewDomain
+          - AcmCertificateArn: !Ref ReviewCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+        Origins:
+          - Id: rehearsal-gateway
+            DomainName: !Ref OriginPrivateDnsName
+            ConnectionAttempts: 2
+            ConnectionTimeout: 5
+            VpcOriginConfig:
+              VpcOriginId: !GetAtt VpcOrigin.Id
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 5
+        DefaultCacheBehavior:
+          TargetOriginId: rehearsal-gateway
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # Cookie・認証・回答をcacheせず、CSRF/Origin/WS headerをそのまま転送する。
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+        # 一時エラーをcacheしたり、APIエラーをSPAの200へ変換したりしない。
+        CustomErrorResponses:
+          - ErrorCode: 400
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 403
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 405
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 414
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 416
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 500
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 501
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 502
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 503
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 504
+            ErrorCachingMinTTL: 0
+      Tags:
+        - Key: DemoId
+          Value: !Ref DemoId
+        - Key: Purpose
+          Value: quiz-rehearsal
+
+  SystemHealthDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Condition: HasMonitoring
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DashboardName: !Sub 'gs-rehearsal-${DemoId}-health'
+      DashboardBody: !Sub |
+        {"start":"-PT3H","periodOverride":"inherit","widgets":[
+          {"type":"text","x":0,"y":0,"width":24,"height":3,"properties":{"markdown":"# 800 VU system health — ${DemoId}\n日本時間 / AWS 系列は配信遅延あり。空欄は未取得であり正常を意味しません。API health は両 API への loopback probe です（CloudFront 経路とは別）。EC2 メモリ、OS プロセス、RDS/Redis アプリクエリの健全性は未監視。監視期限は収集停止のみで資源削除・課金停止ではありません。c7i の CPU credit は判定に使いません。"}},
+          {"type":"metric","x":0,"y":3,"width":8,"height":6,"properties":{"title":"EC2 status checks (0 = OK)","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Maximum","metrics":[["AWS/EC2","StatusCheckFailed","InstanceId","${MonitoringInstanceId}"],["AWS/EC2","StatusCheckFailed_Instance","InstanceId","${MonitoringInstanceId}"],["AWS/EC2","StatusCheckFailed_System","InstanceId","${MonitoringInstanceId}"]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":8,"y":3,"width":8,"height":6,"properties":{"title":"EC2 CPU % (detailed monitoring 1 minute)","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["AWS/EC2","CPUUtilization","InstanceId","${MonitoringInstanceId}"]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":16,"y":3,"width":8,"height":6,"properties":{"title":"API requests / minute","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["GSQuiz/SystemHealth","ApiRequestsPerMinute","Environment","gs-rehearsal-${DemoId}",{}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":0,"y":9,"width":8,"height":6,"properties":{"title":"API health (1 = OK, 0 = failed, blank = unknown)","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Minimum","metrics":[["GSQuiz/SystemHealth","ApiHealth","Environment","gs-rehearsal-${DemoId}","Api","api","Health","live",{"label":"api live"}],["GSQuiz/SystemHealth","ApiHealth","Environment","gs-rehearsal-${DemoId}","Api","api","Health","ready",{"label":"api ready"}],["GSQuiz/SystemHealth","ApiHealth","Environment","gs-rehearsal-${DemoId}","Api","api_secondary","Health","live",{"label":"api_secondary live"}],["GSQuiz/SystemHealth","ApiHealth","Environment","gs-rehearsal-${DemoId}","Api","api_secondary","Health","ready",{"label":"api_secondary ready"}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":8,"y":9,"width":8,"height":6,"properties":{"title":"RDS CPU %","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["AWS/RDS","CPUUtilization","DBInstanceIdentifier","${MonitoringDatabaseIdentifier}"]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":16,"y":9,"width":8,"height":6,"properties":{"title":"RDS free memory / connections","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["AWS/RDS","FreeableMemory","DBInstanceIdentifier","${MonitoringDatabaseIdentifier}"],["AWS/RDS","DatabaseConnections","DBInstanceIdentifier","${MonitoringDatabaseIdentifier}",{"yAxis":"right"}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":0,"y":15,"width":8,"height":6,"properties":{"title":"RDS CPU credits","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":300,"stat":"Average","metrics":[["AWS/RDS","CPUCreditBalance","DBInstanceIdentifier","${MonitoringDatabaseIdentifier}"],["AWS/RDS","CPUSurplusCreditBalance","DBInstanceIdentifier","${MonitoringDatabaseIdentifier}"],["AWS/RDS","CPUSurplusCreditsCharged","DBInstanceIdentifier","${MonitoringDatabaseIdentifier}",{"stat":"Sum"}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":8,"y":15,"width":8,"height":6,"properties":{"title":"Redis engine CPU / memory %","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["AWS/ElastiCache","EngineCPUUtilization","CacheClusterId","${MonitoringRedisClusterId}","CacheNodeId","0001",{}],["AWS/ElastiCache","DatabaseMemoryUsagePercentage","CacheClusterId","${MonitoringRedisClusterId}","CacheNodeId","0001",{}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":16,"y":15,"width":8,"height":6,"properties":{"title":"Redis connections","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["AWS/ElastiCache","CurrConnections","CacheClusterId","${MonitoringRedisClusterId}","CacheNodeId","0001",{}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":0,"y":21,"width":8,"height":6,"properties":{"title":"Redis CPU credits","region":"ap-northeast-1","view":"timeSeries","stacked":false,"period":300,"stat":"Average","metrics":[["AWS/ElastiCache","CPUCreditBalance","CacheClusterId","${MonitoringRedisClusterId}","CacheNodeId","0001",{}]],"legend":{"position":"bottom"},"timezone":"+0900"}},
+          {"type":"metric","x":8,"y":21,"width":16,"height":6,"properties":{"title":"CloudFront requests / 5xx %","region":"us-east-1","view":"timeSeries","stacked":false,"period":60,"stat":"Average","metrics":[["AWS/CloudFront","Requests","DistributionId","${Distribution}","Region","Global",{"stat":"Sum"}],["AWS/CloudFront","5xxErrorRate","DistributionId","${Distribution}","Region","Global",{"yAxis":"right","stat":"Average"}]],"legend":{"position":"bottom"},"timezone":"+0900"}}
+        ]}
+
+Outputs:
+  SystemHealthDashboardName:
+    Condition: HasMonitoring
+    Value: !Ref SystemHealthDashboard
+  PublicUrl:
+    Description: Use this exact origin in REALTIME_ALLOWED_ORIGINS before enabling.
+    Value: !If
+      - HasReviewDomain
+      - !Sub 'https://${ReviewDomainName}'
+      - !Sub 'https://${Distribution.DomainName}'
+  CloudFrontDomainName:
+    Description: Target of the public DNS CNAME; refresh it after recreating the distribution.
+    Value: !GetAtt Distribution.DomainName
+  DistributionId:
+    Value: !Ref Distribution
+  VpcOriginId:
+    Value: !GetAtt VpcOrigin.Id
+  GatewayPort:
+    Value: !Ref GatewayPort

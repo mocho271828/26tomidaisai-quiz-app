@@ -1,0 +1,455 @@
+/* 富大祭 共通デザインルール v0.3.0 に合わせた全画面の土台。
+   色・余白・角丸・文字は tokens.css の変数だけを参照する。 */
+:root {
+  color: var(--color-text-primary);
+  background: var(--color-bg-page);
+  font-family: var(--font-family-body);
+  font-size: var(--font-body);
+  line-height: var(--leading-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  color-scheme: light;
+
+  /* 正誤の「正解」はルールのトークンにない。白い面で 6.6:1 を保つ値をここだけに置く */
+  --quiz-success-text: #176a46;
+
+  /* 運営・司会画面の既存CSSが参照する名前。値はすべてトークンへ向ける */
+  --paper: var(--color-bg-surface);
+  --on-brand: var(--color-text-on-fill);
+  --page-bg: var(--color-bg-page);
+  --line: var(--color-border-default);
+  --line-strong: var(--color-border-strong);
+  --brand: var(--color-action-secondary);
+  --brand-soft: var(--color-bg-surface-soft);
+  --focus: var(--color-focus-ring);
+  --success: var(--quiz-success-text);
+  --danger-dark: var(--color-text-danger);
+  --danger-soft: var(--color-bg-surface);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 0;
+  min-height: 100%;
+  background: var(--color-bg-page);
+}
+
+body {
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--color-bg-page);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+strong {
+  font-weight: var(--weight-bold);
+}
+
+h1 {
+  margin-bottom: var(--space-2);
+  font-family: var(--font-family-display);
+  font-size: var(--font-3xl);
+  font-weight: var(--weight-heavy);
+  font-feature-settings: "palt";
+  line-height: var(--leading-display);
+}
+
+h2 {
+  margin-bottom: var(--space-3);
+  font-family: var(--font-family-display);
+  font-size: var(--font-xl);
+  font-weight: var(--weight-bold);
+  font-feature-settings: "palt";
+  line-height: var(--leading-heading);
+}
+
+/* 数字の書体。和文が混ざる要素では数字の部分だけに当てる */
+.num {
+  font-family: var(--font-family-numeral);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-numeral);
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--color-bg-page);
+}
+
+.festival-logo {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: var(--header-logo-height);
+  aspect-ratio: 756 / 228;
+  object-fit: contain;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* 共通ヘッダー: 青・67px・指定ロゴ。ページ名は本文の h1 に書く */
+.app-header {
+  display: flex;
+  min-height: calc(var(--header-height) + var(--safe-area-top));
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--safe-area-top) max(var(--space-3), var(--safe-area-right)) 0 max(var(--space-3), var(--safe-area-left));
+  color: var(--color-text-on-fill);
+  background: var(--color-bg-header);
+}
+
+.app-header-wordmark {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-xl);
+  font-weight: var(--weight-heavy);
+  font-feature-settings: "palt";
+  line-height: var(--leading-tight);
+}
+
+.app-header-audience {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.app-content {
+  width: min(100% - 2 * var(--space-4), var(--content-max));
+  margin: 0 auto;
+  padding-block: var(--space-6) var(--space-8);
+}
+
+.app-content > h1 {
+  margin-bottom: var(--space-6);
+}
+
+.app-content-answering {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.app-content-operator-wide {
+  width: min(100% - 2 * var(--space-4), 92rem);
+}
+
+/* 白い帯: 角丸 block・影なし。カードを並べず、帯と罫線で区切る */
+.card,
+.metric-card {
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-block);
+}
+
+.card + .card,
+.card + .notice,
+.notice + .card,
+.notice + .notice,
+.metric-grid + .card,
+.toolbar + .card,
+.toolbar + .notice,
+.submission-status + .card,
+.participant-result-stage > .card + .card {
+  margin-top: var(--space-4);
+}
+
+.narrow-card {
+  width: min(100%, var(--content-max));
+  margin-inline: auto;
+}
+
+.centered-card {
+  display: grid;
+  min-height: 13rem;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.centered-card > :last-child {
+  margin-bottom: 0;
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  line-height: var(--leading-body);
+}
+
+/* 通知バー: 白い面＋下辺の線。色だけに頼らずアイコンと文で伝える */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 0;
+  border-bottom: 2px solid var(--color-graphic-accent);
+  border-radius: var(--radius-block);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-compact);
+}
+
+.notice > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.notice-error {
+  color: var(--color-text-danger);
+  border: 2px solid var(--color-border-danger);
+}
+
+.notice-info {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-border-sign);
+}
+
+.notice-info > svg {
+  color: var(--color-action-secondary);
+}
+
+.form-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.form-stack label,
+.compact-form label {
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+input {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 2px solid var(--color-border-input);
+  border-radius: var(--radius-input);
+  font-size: var(--font-body);
+}
+
+input[type="password"] {
+  letter-spacing: 0.12em;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--color-border-danger);
+}
+
+/* ボタン: primary（橙・1画面1つ）／secondary（青）／ghost（白＋青枠）。形はピル、影なし */
+.primary-button,
+.secondary-button,
+.danger-button,
+.text-button,
+.segmented-control button {
+  display: inline-flex;
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-6);
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-body);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-compact);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-base) var(--ease-standard),
+    transform var(--duration-press) var(--ease-standard);
+}
+
+.primary-button {
+  color: var(--color-text-on-fill);
+  background: var(--color-action-primary);
+}
+
+.secondary-button {
+  color: var(--color-text-on-fill);
+  background: var(--color-action-secondary);
+}
+
+.danger-button {
+  color: var(--color-text-on-fill);
+  background: var(--color-text-danger);
+}
+
+.text-button,
+.segmented-control button {
+  color: var(--color-action-secondary);
+  background: var(--color-bg-surface);
+  border-color: var(--color-action-secondary);
+}
+
+@media (hover: hover) {
+  .primary-button:not(:disabled):hover {
+    background: var(--color-action-primary-pressed);
+  }
+
+  .secondary-button:not(:disabled):hover {
+    background: var(--color-action-secondary-pressed);
+  }
+
+  .text-button:not(:disabled):hover,
+  .segmented-control button:not(:disabled):hover {
+    background: var(--color-bg-surface-soft);
+  }
+}
+
+.primary-button:not(:disabled):active,
+.secondary-button:not(:disabled):active,
+.danger-button:not(:disabled):active,
+.text-button:not(:disabled):active,
+.segmented-control button:not(:disabled):active {
+  transform: scale(var(--scale-press));
+}
+
+.primary-button:not(:disabled):active {
+  background: var(--color-action-primary-pressed);
+}
+
+.secondary-button:not(:disabled):active {
+  background: var(--color-action-secondary-pressed);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface);
+  border-bottom: 2px solid var(--color-border-strong);
+}
+
+.toolbar > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.participant-label {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-numeral);
+  font-size: var(--font-lg);
+  letter-spacing: var(--tracking-numeral);
+}
+
+.connection-badge {
+  display: inline-flex;
+  min-height: var(--tag-height);
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+.connection-icon {
+  flex: 0 0 auto;
+}
+
+.connection-live {
+  color: var(--quiz-success-text);
+  border-color: var(--quiz-success-text);
+}
+
+.connection-polling {
+  color: var(--color-text-accent);
+  border-color: var(--color-graphic-accent);
+}
+
+/* 繰り返す動きは「いま待っている」ことを示す読み込み中の印だけ */
+.spinner {
+  display: block;
+  color: var(--color-action-secondary);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 560px) {
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .connection-badge {
+    align-self: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

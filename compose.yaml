@@ -1,0 +1,140 @@
+name: gs-app-tomidaisai
+
+services:
+  postgres:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_DB: quiz_demo
+      POSTGRES_USER: quiz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-only-database-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4.5-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      APP_ENV: ${APP_ENV:-local-demo}
+      DATABASE_URL: postgresql+psycopg://quiz:${POSTGRES_PASSWORD:-local-only-database-password}@postgres:5432/quiz_demo
+      REDIS_URL: redis://redis:6379/0
+      DEMO_OPERATOR_USERNAME: ${DEMO_OPERATOR_USERNAME:-demo-operator}
+      DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-local-demo-only}
+      SESSION_SECRET: ${SESSION_SECRET:-local-demo-session-secret-change-me}
+      ENABLE_DEMO_AUTH: ${ENABLE_DEMO_AUTH:-true}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED:-true}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      REALTIME_ALLOWED_ORIGINS: '${REALTIME_ALLOWED_ORIGINS:-["http://localhost:${GATEWAY_PORT:-8080}"]}'
+      API_INSTANCE_ID: ${API_INSTANCE_ID:-api-local}
+      LOGFIRE_SEND_TO_LOGFIRE: ${LOGFIRE_SEND_TO_LOGFIRE:-false}
+      ROUND_BACKUP_STORAGE_MODE: ${ROUND_BACKUP_STORAGE_MODE:-filesystem}
+      ROUND_BACKUP_DIRECTORY: ${ROUND_BACKUP_DIRECTORY:-/var/lib/quiz-round-backups}
+      ROUND_BACKUP_ENCRYPTION_KEY: ${ROUND_BACKUP_ENCRYPTION_KEY:?run make local-env to create .env with a persistent backup key}
+    volumes:
+      - ./.local/round-backups:/var/lib/quiz-round-backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/live', timeout=2)"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    profiles: ["bootstrap"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      ROUND_BACKUP_ENCRYPTION_KEY: ${ROUND_BACKUP_ENCRYPTION_KEY:?run make local-env to create .env with a persistent backup key}
+      APP_ENV: ${APP_ENV:-local-demo}
+      DATABASE_URL: postgresql+psycopg://quiz:${POSTGRES_PASSWORD:-local-only-database-password}@postgres:5432/quiz_demo
+      ENABLE_DEMO_AUTH: ${ENABLE_DEMO_AUTH:-true}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED:-true}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    profiles: ["bootstrap"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "quiz_app.bootstrap.demo_seed"]
+    environment:
+      ROUND_BACKUP_ENCRYPTION_KEY: ${ROUND_BACKUP_ENCRYPTION_KEY:?run make local-env to create .env with a persistent backup key}
+      APP_ENV: ${APP_ENV:-local-demo}
+      DATABASE_URL: postgresql+psycopg://quiz:${POSTGRES_PASSWORD:-local-only-database-password}@postgres:5432/quiz_demo
+      DEMO_OPERATOR_USERNAME: ${DEMO_OPERATOR_USERNAME:-demo-operator}
+      DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-local-demo-only}
+      SESSION_SECRET: ${SESSION_SECRET:-local-demo-session-secret-change-me}
+      ENABLE_DEMO_AUTH: ${ENABLE_DEMO_AUTH:-true}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED:-true}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      LOGFIRE_SEND_TO_LOGFIRE: ${LOGFIRE_SEND_TO_LOGFIRE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_EVENT_START_AT: ${VITE_EVENT_START_AT:-}
+        VITE_SURVEY_URL: ${VITE_SURVEY_URL:-}
+        VITE_HOME_URL: ${VITE_HOME_URL:-}
+    ports:
+      - "${GATEWAY_BIND_ADDRESS:-127.0.0.1}:${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/api/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  acceptance:
+    profiles: ["acceptance"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    entrypoint: ["python", "-m", "validation.demo_rehearsal_acceptance"]
+    environment:
+      LOCAL_DEMO_BASE_URL: http://gateway:8080
+      LOCAL_DEMO_PARTICIPANT_BASE_URL: ${LOCAL_DEMO_PARTICIPANT_BASE_URL:-http://gateway:8080}
+      DEMO_PARTICIPANT_COUNT: ${DEMO_PARTICIPANT_COUNT:-8}
+      DEMO_OPERATOR_USERNAME: ${DEMO_OPERATOR_USERNAME:-demo-operator}
+      DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-local-demo-only}
+    volumes:
+      - ./validation:/app/validation:ro
+    read_only: true
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

@@ -1,0 +1,132 @@
+.operator-visibility .operator-visibility-intro {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: var(--leading-compact);
+}
+
+.operator-visibility-setting {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.operator-visibility-setting:last-child {
+  padding-bottom: 0;
+}
+
+.operator-visibility-icon {
+  color: var(--color-action-secondary);
+}
+
+.operator-visibility .operator-visibility-description h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-sm);
+  line-height: var(--leading-compact);
+}
+
+.operator-visibility .operator-visibility-description p,
+.operator-visibility .operator-visibility-schedule p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
+}
+
+.operator-visibility-mode {
+  display: inline-block;
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+}
+
+/* 公開の切り替え。状態は色だけでなく「公開／非公開」の文字とつまみの位置でも示す */
+.operator-visibility button.operator-visibility-toggle {
+  display: flex;
+  min-width: 56px;
+  min-height: 56px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-block);
+  background: transparent;
+  color: var(--color-text-secondary);
+  box-shadow: none;
+}
+
+.operator-visibility-toggle .operator-visibility-track {
+  display: block;
+  width: 44px;
+  height: 26px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-secondary);
+}
+
+.operator-visibility-track::before {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-bg-surface);
+  content: "";
+}
+
+.operator-visibility-toggle[aria-pressed="true"] .operator-visibility-track {
+  background: var(--color-action-secondary);
+}
+
+.operator-visibility-toggle[aria-pressed="true"] .operator-visibility-track::before {
+  margin-left: 18px;
+}
+
+.operator-visibility-toggle[aria-pressed="mixed"] .operator-visibility-track::before {
+  margin-left: 9px;
+}
+
+.operator-visibility button.operator-visibility-toggle[aria-pressed="true"] {
+  color: var(--color-action-secondary);
+}
+
+.operator-visibility-toggle strong {
+  font-size: var(--font-xs);
+  line-height: var(--leading-heading);
+}
+
+@media (hover: hover) {
+  .operator-visibility button.operator-visibility-toggle:enabled:hover {
+    background: var(--color-bg-surface-soft);
+  }
+}
+
+.operator-visibility-toggle:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+.operator-visibility button.operator-visibility-toggle:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.operator-visibility-schedule {
+  grid-column: 2 / -1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-block);
+  background: var(--color-bg-surface-soft);
+}
+
+.operator-visibility .operator-visibility-schedule p {
+  color: var(--color-text-primary);
+}
+
+.operator-visibility .operator-visibility-schedule p + p {
+  margin-top: var(--space-1);
+}

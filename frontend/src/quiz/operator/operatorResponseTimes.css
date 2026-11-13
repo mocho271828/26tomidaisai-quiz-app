@@ -1,0 +1,53 @@
+.operator-response-times-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+}
+
+.operator-response-times-filters label {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+  color: var(--color-text-primary);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.operator-response-times-filters select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 2px solid var(--color-border-input);
+  border-radius: var(--radius-input);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-body);
+  font-weight: var(--weight-regular);
+}
+
+.operator-response-times-filters select:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+.operator-response-times-filters select:disabled {
+  opacity: 0.45;
+}
+
+.operator-card .operator-response-times-question {
+  margin-bottom: var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.operator-response-times-error {
+  margin-block: var(--space-4);
+}
+
+@media (max-width: 390px) {
+  .operator-response-times-filters {
+    grid-template-columns: 1fr;
+  }
+}

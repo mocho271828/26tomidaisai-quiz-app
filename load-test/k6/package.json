@@ -1,0 +1,28 @@
+{
+  "name": "@tomidaisai/load-test-k6",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "inspect:k6": "node scripts/inspect-generator.mjs",
+    "lint": "eslint .",
+    "run:generator": "node dist/generator-cli.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/k6": "^2.2.0",
+    "@types/node": "^24.3.0",
+    "esbuild": "0.28.1",
+    "eslint": "^9.35.0",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@11.15.1"
+}

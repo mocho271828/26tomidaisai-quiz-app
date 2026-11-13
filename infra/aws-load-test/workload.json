@@ -1,0 +1,1583 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Disposable private AWS-only load test; all data is synthetic and deleted.",
+  "Parameters": {
+    "Prefix": {
+      "Type": "String",
+      "AllowedPattern": "gs-lt-[0-9a-f]{32}"
+    },
+    "RunId": {
+      "Type": "String",
+      "AllowedPattern": "[0-9a-f-]{36}"
+    },
+    "ExpiresAt": {
+      "Type": "String"
+    },
+    "AmiId": {
+      "Type": "AWS::EC2::Image::Id"
+    },
+    "AvailabilityZone": {
+      "Type": "AWS::EC2::AvailabilityZone::Name"
+    },
+    "SecondaryAvailabilityZone": {
+      "Type": "AWS::EC2::AvailabilityZone::Name"
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "CidrBlock": "10.77.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.77.1.0/24",
+        "AvailabilityZone": {
+          "Ref": "AvailabilityZone"
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "PrivateSubnetA": {
+      "Type": "AWS::EC2::Subnet",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.77.2.0/24",
+        "AvailabilityZone": {
+          "Ref": "AvailabilityZone"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "PrivateSubnetB": {
+      "Type": "AWS::EC2::Subnet",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "CidrBlock": "10.77.3.0/24",
+        "AvailabilityZone": {
+          "Ref": "SecondaryAvailabilityZone"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "Route": {
+      "Type": "AWS::EC2::Route",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      },
+      "DependsOn": "GatewayAttachment"
+    },
+    "RouteAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        }
+      }
+    },
+    "RunnerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "GroupDescription": "Run-specific load generator without inbound access",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "AppSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "GroupDescription": "HTTPS from the independent load generator only",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "SourceSecurityGroupId": {
+              "Ref": "RunnerSecurityGroup"
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "DatabaseSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "GroupDescription": "PostgreSQL from app and read-only verifier",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 5432,
+            "ToPort": 5432,
+            "SourceSecurityGroupId": {
+              "Ref": "AppSecurityGroup"
+            }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 5432,
+            "ToPort": 5432,
+            "SourceSecurityGroupId": {
+              "Ref": "RunnerSecurityGroup"
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RedisSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "GroupDescription": "Redis TLS from application only",
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 6379,
+            "ToPort": 6379,
+            "SourceSecurityGroupId": {
+              "Ref": "AppSecurityGroup"
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "DatabaseSubnets": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "DBSubnetGroupDescription": "Run-owned database subnets",
+        "SubnetIds": [
+          {
+            "Ref": "PrivateSubnetA"
+          },
+          {
+            "Ref": "PrivateSubnetB"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "DBSubnetGroupName": {
+          "Fn::Sub": "${Prefix}-database"
+        }
+      }
+    },
+    "RedisSubnets": {
+      "Type": "AWS::ElastiCache::SubnetGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Description": "Run-owned Redis subnets",
+        "SubnetIds": [
+          {
+            "Ref": "PrivateSubnetA"
+          },
+          {
+            "Ref": "PrivateSubnetB"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "CacheSubnetGroupName": {
+          "Fn::Sub": "${Prefix}-redis"
+        }
+      }
+    },
+    "RedisSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}/redis"
+        },
+        "GenerateSecretString": {
+          "PasswordLength": 40,
+          "ExcludePunctuation": true
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "Database": {
+      "Type": "AWS::RDS::DBInstance",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "DBInstanceIdentifier": {
+          "Fn::Sub": "${Prefix}-postgres"
+        },
+        "DBName": "quiz",
+        "DBInstanceClass": "db.t4g.small",
+        "Engine": "postgres",
+        "EngineVersion": "16.15",
+        "DBParameterGroupName": "default.postgres16",
+        "OptionGroupName": "default:postgres-16",
+        "EngineLifecycleSupport": "open-source-rds-extended-support-disabled",
+        "AllocatedStorage": "20",
+        "MaxAllocatedStorage": 20,
+        "StorageType": "gp3",
+        "StorageEncrypted": true,
+        "MasterUsername": "quizadmin",
+        "DBSubnetGroupName": {
+          "Ref": "DatabaseSubnets"
+        },
+        "VPCSecurityGroups": [
+          {
+            "Ref": "DatabaseSecurityGroup"
+          }
+        ],
+        "AvailabilityZone": {
+          "Ref": "AvailabilityZone"
+        },
+        "MultiAZ": false,
+        "PubliclyAccessible": false,
+        "BackupRetentionPeriod": 0,
+        "DeleteAutomatedBackups": true,
+        "DeletionProtection": false,
+        "AutoMinorVersionUpgrade": false,
+        "CopyTagsToSnapshot": true,
+        "MonitoringInterval": 0,
+        "EnablePerformanceInsights": false,
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "MasterUserPassword": {
+          "Fn::Sub": "{{resolve:secretsmanager:${DatabaseSecret}:SecretString}}"
+        }
+      }
+    },
+    "Redis": {
+      "Type": "AWS::ElastiCache::ReplicationGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "ReplicationGroupId": {
+          "Ref": "Prefix"
+        },
+        "ReplicationGroupDescription": "Run-owned notification-only Redis",
+        "CacheNodeType": "cache.t4g.small",
+        "Engine": "redis",
+        "EngineVersion": "7.1",
+        "CacheParameterGroupName": "default.redis7",
+        "NumCacheClusters": 1,
+        "AutomaticFailoverEnabled": false,
+        "MultiAZEnabled": false,
+        "AtRestEncryptionEnabled": true,
+        "TransitEncryptionEnabled": true,
+        "CacheSubnetGroupName": {
+          "Ref": "RedisSubnets"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "RedisSecurityGroup"
+          }
+        ],
+        "PreferredCacheClusterAZs": [
+          {
+            "Ref": "AvailabilityZone"
+          }
+        ],
+        "SnapshotRetentionLimit": 0,
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "UserGroupIds": [
+          {
+            "Ref": "RedisUsers"
+          }
+        ]
+      }
+    },
+    "AppRepository": {
+      "Type": "AWS::ECR::Repository",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "RepositoryName": {
+          "Fn::Sub": "${Prefix}/app"
+        },
+        "ImageTagMutability": "IMMUTABLE",
+        "EmptyOnDelete": true,
+        "EncryptionConfiguration": {
+          "EncryptionType": "AES256"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "GatewayRepository": {
+      "Type": "AWS::ECR::Repository",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "RepositoryName": {
+          "Fn::Sub": "${Prefix}/gateway"
+        },
+        "ImageTagMutability": "IMMUTABLE",
+        "EmptyOnDelete": true,
+        "EncryptionConfiguration": {
+          "EncryptionType": "AES256"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "Artifacts": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${Prefix}-${AWS::AccountId}"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "EmergencyExpiry",
+              "Status": "Enabled",
+              "ExpirationInDays": 1,
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 1
+              },
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "AppRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${Prefix}-app"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "ReadRunArtifacts",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:::${Artifacts}/evidence/app-worker/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:GetAuthorizationToken"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:BatchGetImage",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchCheckLayerAvailability"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "AppRepository",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "GatewayRepository",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:${Prefix}-cleanup"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/deployment/app/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:DescribeExecution"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:execution:${Prefix}-cleanup:cleanup"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "AppProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "AppRole"
+          }
+        ],
+        "InstanceProfileName": {
+          "Fn::Sub": "${Prefix}-app"
+        }
+      }
+    },
+    "AppInstance": {
+      "Type": "AWS::EC2::Instance",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "ImageId": {
+          "Ref": "AmiId"
+        },
+        "InstanceType": "m6a.2xlarge",
+        "IamInstanceProfile": {
+          "Ref": "AppProfile"
+        },
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "AppSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpEndpoint": "enabled",
+          "HttpPutResponseHopLimit": 1
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "VolumeType": "gp3",
+              "VolumeSize": 80,
+              "Encrypted": true,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "PropagateTagsToVolumeOnCreation": true,
+        "PrivateIpAddress": "10.77.1.10"
+      },
+      "DependsOn": "Route"
+    },
+    "RunnerRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${Prefix}-runner"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "ReadRunArtifacts",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:::${Artifacts}/evidence/runner/archive.tar.gz"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${Artifacts}/evidence/app-worker/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${Artifacts}/evidence/runner/collected.json"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Artifacts",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "s3:prefix": "evidence/runner/collected.json"
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:GetAuthorizationToken"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:BatchGetImage",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchCheckLayerAvailability"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "AppRepository",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "GatewayRepository",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:${Prefix}-cleanup"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/deployment/runner/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:DescribeExecution"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:execution:${Prefix}-cleanup:cleanup"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RunnerProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "RunnerRole"
+          }
+        ],
+        "InstanceProfileName": {
+          "Fn::Sub": "${Prefix}-runner"
+        }
+      }
+    },
+    "RunnerInstance": {
+      "Type": "AWS::EC2::Instance",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "ImageId": {
+          "Ref": "AmiId"
+        },
+        "InstanceType": "m6a.xlarge",
+        "IamInstanceProfile": {
+          "Ref": "RunnerProfile"
+        },
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        },
+        "SecurityGroupIds": [
+          {
+            "Ref": "RunnerSecurityGroup"
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpEndpoint": "enabled",
+          "HttpPutResponseHopLimit": 1
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "VolumeType": "gp3",
+              "VolumeSize": 40,
+              "Encrypted": true,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ],
+        "PropagateTagsToVolumeOnCreation": true,
+        "PrivateIpAddress": "10.77.1.11"
+      },
+      "DependsOn": "Route"
+    },
+    "DatabaseSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}/database-admin"
+        },
+        "GenerateSecretString": {
+          "PasswordLength": 40,
+          "ExcludePunctuation": true
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RunnerAppWorkerPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "StartAppWorker",
+        "Roles": [
+          {
+            "Ref": "RunnerRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ssm:SendCommand"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${Prefix}-app-worker"
+                },
+                {
+                  "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${AppInstance}"
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ssm:GetCommandInvocation"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "RedisMonitorSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${Prefix}/redis-monitor"
+        },
+        "GenerateSecretString": {
+          "PasswordLength": 40,
+          "ExcludePunctuation": true
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RedisAppUser": {
+      "Type": "AWS::ElastiCache::User",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "UserId": {
+          "Fn::Sub": "${Prefix}a"
+        },
+        "UserName": "default",
+        "Engine": "redis",
+        "AccessString": "on -@all +ping +publish +subscribe +unsubscribe +psubscribe +punsubscribe +client|setname +hello +select &quiz:realtime:*",
+        "Passwords": [
+          {
+            "Fn::Sub": "{{resolve:secretsmanager:${RedisSecret}:SecretString}}"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RedisMonitorUser": {
+      "Type": "AWS::ElastiCache::User",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "UserId": {
+          "Fn::Sub": "${Prefix}m"
+        },
+        "UserName": "metrics",
+        "Engine": "redis",
+        "AccessString": "on -@all +ping +info +client|setname +config|get +slowlog|get +slowlog|len +latency|latest +memory|stats +cluster|info",
+        "Passwords": [
+          {
+            "Fn::Sub": "{{resolve:secretsmanager:${RedisMonitorSecret}:SecretString}}"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    },
+    "RedisUsers": {
+      "Type": "AWS::ElastiCache::UserGroup",
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete",
+      "Properties": {
+        "UserGroupId": {
+          "Fn::Sub": "${Prefix}u"
+        },
+        "Engine": "redis",
+        "UserIds": [
+          {
+            "Ref": "RedisAppUser"
+          },
+          {
+            "Ref": "RedisMonitorUser"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "gs-app-tomidaisai"
+          },
+          {
+            "Key": "Purpose",
+            "Value": "load-test-aws-only"
+          },
+          {
+            "Key": "RunId",
+            "Value": {
+              "Ref": "RunId"
+            }
+          },
+          {
+            "Key": "ExpiresAt",
+            "Value": {
+              "Ref": "ExpiresAt"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "AppRepositoryUri": {
+      "Value": {
+        "Fn::GetAtt": [
+          "AppRepository",
+          "RepositoryUri"
+        ]
+      }
+    },
+    "GatewayRepositoryUri": {
+      "Value": {
+        "Fn::GetAtt": [
+          "GatewayRepository",
+          "RepositoryUri"
+        ]
+      }
+    },
+    "AppInstanceId": {
+      "Description": "AppInstanceId",
+      "Value": {
+        "Ref": "AppInstance"
+      }
+    },
+    "RunnerInstanceId": {
+      "Description": "RunnerInstanceId",
+      "Value": {
+        "Ref": "RunnerInstance"
+      }
+    },
+    "AppPrivateIp": {
+      "Description": "AppPrivateIp",
+      "Value": {
+        "Fn::GetAtt": [
+          "AppInstance",
+          "PrivateIp"
+        ]
+      }
+    },
+    "RunnerPrivateIp": {
+      "Description": "RunnerPrivateIp",
+      "Value": {
+        "Fn::GetAtt": [
+          "RunnerInstance",
+          "PrivateIp"
+        ]
+      }
+    },
+    "DatabaseEndpoint": {
+      "Description": "DatabaseEndpoint",
+      "Value": {
+        "Fn::GetAtt": [
+          "Database",
+          "Endpoint.Address"
+        ]
+      }
+    },
+    "DatabaseAdminSecretArn": {
+      "Description": "DatabaseAdminSecretArn",
+      "Value": {
+        "Ref": "DatabaseSecret"
+      }
+    },
+    "RedisEndpoint": {
+      "Description": "RedisEndpoint",
+      "Value": {
+        "Fn::GetAtt": [
+          "Redis",
+          "PrimaryEndPoint.Address"
+        ]
+      }
+    },
+    "ArtifactBucket": {
+      "Description": "ArtifactBucket",
+      "Value": {
+        "Ref": "Artifacts"
+      }
+    },
+    "RedisAppSecretArn": {
+      "Value": {
+        "Ref": "RedisSecret"
+      }
+    },
+    "RedisMonitorSecretArn": {
+      "Value": {
+        "Ref": "RedisMonitorSecret"
+      }
+    }
+  }
+}

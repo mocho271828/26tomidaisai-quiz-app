@@ -1,0 +1,403 @@
+.participant-round-header {
+  display: flex;
+  min-height: 0;
+  height: 48px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.participant-round-header .tommy-mascot {
+  width: 50px;
+  height: 48px;
+}
+
+/* 何問目かのタグ。橙は残り時間（いま）と主要操作だけに使うため、青の塗りにする */
+.participant-round-badge {
+  display: inline-flex;
+  min-height: var(--tag-height);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-2);
+  color: var(--color-text-on-fill);
+  background: var(--color-bg-header);
+  border-radius: var(--radius-chip);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.participant-question-stage {
+  display: flex;
+  min-height: 0;
+  flex: 0 1 auto;
+  flex-direction: column;
+}
+
+.participant-question {
+  display: flex;
+  min-height: 0;
+  flex: 0 1 auto;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+/* 問題文は長い文なので本文の書体で太く大きく組む（見出し書体は短い見出しだけ） */
+.participant-question-prompt {
+  flex: 0 0 auto;
+  margin: var(--space-3) 0 var(--space-5);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+  font-size: var(--font-2xl);
+  font-weight: var(--weight-bold);
+  font-feature-settings: normal;
+  line-height: var(--leading-heading);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+/* 経過時間は「いま」を示す主役の数字。橙の文字は水色の下地で18px以上の太字だけ */
+.participant-timer-card {
+  flex: 0 0 auto;
+  margin-bottom: var(--space-5);
+  padding-top: var(--space-2);
+}
+
+.participant-timer-values {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-sm);
+}
+
+.participant-timer-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--weight-bold);
+}
+
+.participant-timer-label img,
+.participant-live-shell .answer-state img,
+.submission-status-message img {
+  flex: 0 0 auto;
+}
+
+.participant-live-shell .quiz-stage-progress {
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-bg-surface);
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+
+.participant-live-shell .quiz-stage-progress-bar {
+  display: block;
+  height: 100%;
+  background: var(--color-graphic-now);
+  border-radius: inherit;
+  transition: width 100ms linear;
+}
+
+.participant-live-shell .countdown {
+  display: flex;
+  width: auto;
+  height: auto;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  color: var(--color-text-accent);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.participant-live-shell .countdown strong {
+  color: inherit;
+  font-family: var(--font-family-numeral);
+  font-size: var(--font-4xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-numeral);
+}
+
+.participant-live-shell .countdown span {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-numeral);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+.participant-live-shell .answer-fieldset {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 0 1 auto;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.participant-live-shell .answer-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+}
+
+/* 選択肢は押せる行。白い面＋青2pxの枠、角丸 block、影・すりガラスなし */
+.participant-live-shell .answer-button {
+  display: grid;
+  min-width: 0;
+  min-height: var(--touch-min);
+  height: 72px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 2px solid var(--color-border-input);
+  border-radius: var(--radius-block);
+  font-size: var(--font-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-compact);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-base) var(--ease-standard), transform var(--duration-press) var(--ease-standard);
+}
+
+.participant-live-shell .answer-label {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: var(--color-text-on-fill);
+  background: var(--color-action-secondary);
+  border-radius: var(--radius-block);
+  font-family: var(--font-family-numeral);
+  font-size: var(--font-lg);
+  font-weight: var(--weight-bold);
+}
+
+.participant-live-shell .answer-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) {
+  .participant-live-shell .answer-button:not(:disabled):hover {
+    background: var(--color-bg-surface-soft);
+  }
+}
+
+.participant-live-shell .answer-button:not(:disabled):active {
+  transform: scale(var(--scale-press-card));
+}
+
+.participant-live-shell .answer-button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* 選択中は塗り＋太字＋チェックの印。色だけで伝えない */
+.participant-live-shell .selected-answer,
+.participant-live-shell .selected-answer:disabled {
+  color: var(--color-text-on-fill);
+  background: var(--color-action-secondary);
+  border-color: var(--color-action-secondary);
+}
+
+.participant-live-shell .selected-answer .answer-label {
+  color: var(--color-action-secondary);
+  background: var(--color-bg-surface);
+}
+
+.participant-live-shell .answer-state {
+  display: inline-flex;
+  align-items: center;
+}
+
+.participant-answer-hint {
+  flex: 0 0 auto;
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-sm);
+  line-height: var(--leading-compact);
+  text-align: center;
+}
+
+.participant-live-shell .submission-status {
+  display: flex;
+  min-height: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-5);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-compact);
+}
+
+.submission-status-message {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.submission-status-detail {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-regular);
+}
+
+.participant-live-shell .submission-accepted {
+  color: var(--quiz-success-text);
+}
+
+.participant-live-shell .submission-not-stored,
+.participant-live-shell .submission-rejected {
+  color: var(--color-text-danger);
+}
+
+.participant-live-shell .submission-status button {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  font-size: var(--font-sm);
+}
+
+.participant-question-stage[aria-hidden="true"] {
+  position: absolute;
+  inset: calc(var(--header-height) + var(--safe-area-top)) 0 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.participant-collection-overlay {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.participant-collection-card {
+  width: 100%;
+}
+
+.participant-collection-card .submission-status {
+  width: 100%;
+  padding: 0;
+}
+
+@media (max-height: 730px) {
+  .participant-question {
+    padding-top: 2px;
+    padding-bottom: var(--space-2);
+  }
+
+  .participant-question-prompt {
+    margin: var(--space-2) 0 var(--space-3);
+    font-size: var(--font-xl);
+  }
+
+  .participant-timer-card {
+    margin-bottom: var(--space-3);
+    padding-top: 0;
+  }
+
+  .participant-live-shell .countdown strong {
+    font-size: var(--font-3xl);
+  }
+
+  .participant-live-shell .answer-grid {
+    gap: var(--space-2);
+  }
+
+  .participant-live-shell .answer-button {
+    height: clamp(44px, 8.2dvh, 60px);
+    font-size: var(--font-body);
+    line-height: var(--leading-heading);
+  }
+
+  .participant-answer-hint {
+    margin-top: var(--space-3);
+  }
+
+  .participant-live-shell .submission-status {
+    padding-bottom: var(--space-3);
+  }
+}
+
+@media (max-height: 600px) {
+  .participant-live-shell .answer-button {
+    font-size: var(--font-sm);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .participant-question {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    gap: var(--space-2) var(--space-5);
+  }
+
+  .participant-round-header {
+    height: 36px;
+  }
+
+  .participant-round-header .tommy-mascot {
+    width: 42px;
+    height: 36px;
+  }
+
+  .participant-question-prompt {
+    margin: 0;
+    align-self: center;
+    font-size: var(--font-xl);
+  }
+
+  .participant-timer-card {
+    margin: 0;
+  }
+
+  .participant-live-shell .answer-fieldset {
+    grid-column: 2;
+    grid-row: 1 / 4;
+  }
+
+  .participant-live-shell .answer-grid {
+    gap: var(--space-2);
+  }
+
+  .participant-live-shell .answer-button {
+    height: var(--touch-min);
+    font-size: var(--font-sm);
+  }
+
+  .participant-answer-hint {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+
+  .participant-live-shell .submission-status {
+    gap: 2px;
+  }
+
+  .participant-question-stage[aria-hidden="true"] {
+    inset: calc(var(--touch-min) + var(--safe-area-top)) 0 0;
+  }
+}

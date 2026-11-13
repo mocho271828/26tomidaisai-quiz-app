@@ -1,0 +1,400 @@
+services:
+  api:
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    environment:
+      AWS_DEMO_ROUND_SCOPE: load-test-ten-round
+      API_INSTANCE_ID: api-primary
+    networks:
+      - default
+      - metrics
+      - fault-data
+    extra_hosts:
+      - "${AWS_DEMO_REDIS_HOSTNAME:?AWS_DEMO_REDIS_HOSTNAME must be explicit}=172.30.250.2"
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_ROUND_BACKUP_HOST_DIRECTORY:?AWS_DEMO_ROUND_BACKUP_HOST_DIRECTORY must be explicit}
+        target: /var/lib/quiz-round-backups
+        bind:
+          create_host_path: false
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/live', timeout=2)"
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+
+  api-secondary:
+    image: ${AWS_DEMO_API_IMAGE:?AWS_DEMO_API_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    env_file:
+      - path: ${AWS_DEMO_RUNTIME_ENV_FILE:?AWS_DEMO_RUNTIME_ENV_FILE must be explicit}
+        required: true
+        format: raw
+    environment:
+      AWS_DEMO_ROUND_SCOPE: load-test-ten-round
+      API_INSTANCE_ID: api-secondary
+    networks:
+      - default
+      - metrics
+      - fault-data
+    extra_hosts:
+      - "${AWS_DEMO_REDIS_HOSTNAME:?AWS_DEMO_REDIS_HOSTNAME must be explicit}=172.30.250.2"
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_POSTGRES_CA_FILE:?AWS_DEMO_POSTGRES_CA_FILE must be explicit}
+        target: /run/secrets/aws-demo-postgres-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AWS_DEMO_ROUND_BACKUP_HOST_DIRECTORY:?AWS_DEMO_ROUND_BACKUP_HOST_DIRECTORY must be explicit}
+        target: /var/lib/quiz-round-backups
+        bind:
+          create_host_path: false
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/live', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+
+  gateway:
+    entrypoint:
+      - caddy
+    command:
+      - run
+      - --config
+      - /etc/caddy/Caddyfile.load-test
+      - --adapter
+      - caddyfile
+    depends_on:
+      api:
+        condition: service_healthy
+      api-secondary:
+        condition: service_healthy
+    expose:
+      - "2019"
+    networks:
+      - default
+      - metrics
+
+  preflight:
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    environment:
+      AWS_DEMO_TOXIPROXY_CONFIG_SHA256: ${AWS_DEMO_TOXIPROXY_CONFIG_SHA256:?AWS_DEMO_TOXIPROXY_CONFIG_SHA256 must be explicit}
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_TOXIPROXY_CONFIG_FILE:?AWS_DEMO_TOXIPROXY_CONFIG_FILE must be explicit}
+        target: /run/load-test/toxiproxy.json
+        read_only: true
+        bind:
+          create_host_path: false
+
+  toxiproxy:
+    image: ${AWS_DEMO_TOXIPROXY_IMAGE:?AWS_DEMO_TOXIPROXY_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    command:
+      - -host
+      - 172.30.251.2
+      - -port
+      - "8474"
+      - -config
+      - /run/load-test/toxiproxy.json
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_TOXIPROXY_CONFIG_FILE:?AWS_DEMO_TOXIPROXY_CONFIG_FILE must be explicit}
+        target: /run/load-test/toxiproxy.json
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      default: {}
+      fault-data:
+        ipv4_address: 172.30.250.2
+        aliases:
+          - "${AWS_DEMO_REDIS_HOSTNAME:?AWS_DEMO_REDIS_HOSTNAME must be explicit}"
+      fault-control:
+        ipv4_address: 172.30.251.2
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    stop_grace_period: 10s
+    healthcheck:
+      test:
+        - CMD
+        - /toxiproxy-cli
+        - --host
+        - http://172.30.251.2:8474
+        - inspect
+        - gs-app-tomidaisai-aws-demo-redis
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  # 正式controllerはseal済みminimal Composeを使う。この定義はpreflight/diagnostic専用。
+  fault-control-client:
+    profiles: ["fault-control"]
+    image: ${AWS_DEMO_API_IMAGE:?AWS_DEMO_API_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    entrypoint:
+      - python
+      - -m
+      - quiz_app.load_test.fault_control_probe
+    command:
+      - probe
+    environment:
+      AWS_DEMO_TOXIPROXY_CONFIG_SHA256: ${AWS_DEMO_TOXIPROXY_CONFIG_SHA256:?AWS_DEMO_TOXIPROXY_CONFIG_SHA256 must be explicit}
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_TOXIPROXY_CONFIG_FILE:?AWS_DEMO_TOXIPROXY_CONFIG_FILE must be explicit}
+        target: /run/load-test/toxiproxy.json
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - fault-control
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+
+  prometheus:
+    image: ${AWS_DEMO_PROMETHEUS_IMAGE:?AWS_DEMO_PROMETHEUS_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=14d
+      - --web.listen-address=:9090
+    volumes:
+      - type: bind
+        source: ../../infra/prometheus.load-test.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: prometheus-data
+        target: /prometheus
+    expose:
+      - "9090"
+    networks:
+      - metrics
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  postgres-exporter:
+    image: ${AWS_DEMO_POSTGRES_EXPORTER_IMAGE:?AWS_DEMO_POSTGRES_EXPORTER_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    environment:
+      DATA_SOURCE_URI: ${AWS_DEMO_POSTGRES_EXPORTER_URI:?AWS_DEMO_POSTGRES_EXPORTER_URI must be explicit}
+      DATA_SOURCE_USER: ${AWS_DEMO_POSTGRES_EXPORTER_USER:?AWS_DEMO_POSTGRES_EXPORTER_USER must be explicit}
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres-exporter-password
+      PG_EXPORTER_COLLECTION_TIMEOUT: 850ms
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_POSTGRES_EXPORTER_PASSWORD_FILE:?AWS_DEMO_POSTGRES_EXPORTER_PASSWORD_FILE must be explicit}
+        target: /run/secrets/postgres-exporter-password
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AWS_DEMO_POSTGRES_CA_FILE:?AWS_DEMO_POSTGRES_CA_FILE must be explicit}
+        target: /run/secrets/aws-demo-postgres-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "9187"
+    networks:
+      - default
+      - metrics
+    read_only: true
+    tmpfs:
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  redis-exporter:
+    image: ${AWS_DEMO_REDIS_EXPORTER_IMAGE:?AWS_DEMO_REDIS_EXPORTER_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    environment:
+      REDIS_ADDR: ${AWS_DEMO_REDIS_EXPORTER_ADDR:?AWS_DEMO_REDIS_EXPORTER_ADDR must be explicit}
+      REDIS_USER: ${AWS_DEMO_REDIS_EXPORTER_USER:?AWS_DEMO_REDIS_EXPORTER_USER must be explicit}
+      REDIS_PASSWORD_FILE: /run/secrets/redis-exporter-password.json
+      REDIS_EXPORTER_CONNECTION_TIMEOUT: 850ms
+      REDIS_EXPORTER_DISABLE_SCRAPE_ENDPOINT: "true"
+      REDIS_EXPORTER_EXPORT_CLIENT_LIST: "false"
+      REDIS_EXPORTER_INCL_CONFIG_METRICS: "false"
+      REDIS_EXPORTER_REDACT_CONFIG_METRICS: "true"
+      REDIS_EXPORTER_SKIP_TLS_VERIFICATION: "false"
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_REDIS_EXPORTER_PASSWORD_FILE:?AWS_DEMO_REDIS_EXPORTER_PASSWORD_FILE must be explicit}
+        target: /run/secrets/redis-exporter-password.json
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "9121"
+    networks:
+      - default
+      - metrics
+      - fault-data
+    extra_hosts:
+      - "${AWS_DEMO_REDIS_HOSTNAME:?AWS_DEMO_REDIS_HOSTNAME must be explicit}=172.30.250.2"
+    read_only: true
+    tmpfs:
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+
+  node-exporter:
+    profiles: ["node-metrics"]
+    image: ${AWS_DEMO_NODE_EXPORTER_IMAGE:?AWS_DEMO_NODE_EXPORTER_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "65534:65534"
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.loadavg
+      - --collector.meminfo
+      - --collector.stat
+      - --collector.time
+    volumes:
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /sys
+        target: /host/sys
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "9100"
+    networks:
+      - metrics
+    read_only: true
+    tmpfs:
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  metrics-export:
+    profiles: ["metrics-export"]
+    image: ${AWS_DEMO_API_IMAGE:?AWS_DEMO_API_IMAGE must be pinned by digest}
+    pull_policy: never
+    user: "${AWS_DEMO_RUNTIME_UID:?AWS_DEMO_RUNTIME_UID must be explicit}:${AWS_DEMO_RUNTIME_GID:?AWS_DEMO_RUNTIME_GID must be explicit}"
+    entrypoint:
+      - python
+      - -m
+      - quiz_app.load_test.metrics_export
+      - --manifest
+      - /run/load-test/manifest.json
+      - --repository-root
+      - /app
+    networks:
+      - metrics
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_LOAD_TEST_MANIFEST_FILE:?AWS_DEMO_LOAD_TEST_MANIFEST_FILE must be explicit}
+        target: /run/load-test/manifest.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${AWS_DEMO_METRICS_ARTIFACT_HOST_DIRECTORY:?AWS_DEMO_METRICS_ARTIFACT_HOST_DIRECTORY must be explicit}
+        target: /artifacts
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    depends_on:
+      prometheus:
+        condition: service_started
+
+volumes:
+  prometheus-data:
+    name: gs-app-tomidaisai-aws-demo-prometheus-data
+
+networks:
+  metrics:
+    internal: true
+  fault-data:
+    internal: true
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.250.0/29
+  fault-control:
+    internal: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+    ipam:
+      config:
+        - subnet: 172.30.251.0/29

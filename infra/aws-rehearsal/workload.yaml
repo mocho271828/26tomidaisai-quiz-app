@@ -1,0 +1,584 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Disposable private compute and data services for the five-question rehearsal.
+
+Parameters:
+  ManualReview:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['false', 'true']
+  DemoId:
+    Type: String
+    MinLength: 1
+    # Redisの固定prefix/suffix 19文字と合わせて40文字以内にし、禁止された連続hyphenを防ぐ。
+    MaxLength: 21
+    AllowedPattern: '[a-z0-9]+(-[a-z0-9]+)*'
+  AppAvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Tokyo AZ whose ZoneId is not apne1-az3; verify the account-specific mapping.
+  SecondaryAvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: A different Tokyo AZ for the RDS subnet group.
+  UbuntuAmiId:
+    Type: AWS::EC2::Image::Id
+    Description: Verified Canonical Ubuntu 24.04 LTS amd64 AMI in ap-northeast-1.
+  AppInstanceType:
+    Type: String
+    Default: c7i.xlarge
+    AllowedValues: [c7i.xlarge, t3.medium]
+  DatabaseEngineVersion:
+    Type: String
+    Default: '16.15'
+    AllowedPattern: '16\.[0-9]+'
+    Description: PostgreSQL 16 minor version verified as orderable in this region.
+  ArtifactBucketName:
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: '[a-z0-9][a-z0-9.-]*[a-z0-9]'
+    Description: Dedicated control-stack bucket; this instance reads only DemoId/*.
+
+Conditions:
+  IsManualReview: !Equals [!Ref ManualReview, 'true']
+  IsBurstableApp: !Equals [!Ref AppInstanceType, t3.medium]
+
+Rules:
+  DifferentAvailabilityZones:
+    Assertions:
+      - Assert: !Not [!Equals [!Ref AppAvailabilityZone, !Ref SecondaryAvailabilityZone]]
+        AssertDescription: The two private subnets must be in different availability zones.
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      CidrBlock: 10.78.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AppAvailabilityZone
+      CidrBlock: 10.78.0.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  AppSubnet:
+    Type: AWS::EC2::Subnet
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AppAvailabilityZone
+      CidrBlock: 10.78.1.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  SecondaryPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref SecondaryAvailabilityZone
+      CidrBlock: 10.78.2.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  PublicRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  NatAddress:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Domain: vpc
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: [PublicDefaultRoute, PublicRouteAssociation]
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      AllocationId: !GetAtt NatAddress.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  AppRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      SubnetId: !Ref AppSubnet
+      RouteTableId: !Ref PrivateRouteTable
+
+  SecondaryRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      SubnetId: !Ref SecondaryPrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupDescription: No inbound until the dedicated CloudFront edge stack is attached
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        # SSM・ECR・S3とOS初期設定の取得先へNAT経由で接続する。
+        - Description: AWS APIs and HTTPS package downloads through NAT
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: Ubuntu package downloads through NAT
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupDescription: PostgreSQL from the dedicated application instance only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: PostgreSQL from the dedicated application instance
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupDescription: TLS Redis from the dedicated application instance only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: TLS Redis from the dedicated application instance
+          IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  AppDatabaseEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Description: PostgreSQL to the dedicated database
+      GroupId: !Ref AppSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      DestinationSecurityGroupId: !Ref DatabaseSecurityGroup
+
+  AppRedisEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Description: TLS Redis to the dedicated cache
+      GroupId: !Ref AppSecurityGroup
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      DestinationSecurityGroupId: !Ref RedisSecurityGroup
+
+  DatabaseSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBSubnetGroupName: !If [IsManualReview, !Sub 'gs-rehearsal-${DemoId}-db', !Ref 'AWS::NoValue']
+      DBSubnetGroupDescription: Two private subnets for the disposable rehearsal database
+      SubnetIds: [!Ref AppSubnet, !Ref SecondaryPrivateSubnet]
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !If [IsManualReview, !Sub 'gs-rehearsal-${DemoId}-db', !Ref 'AWS::NoValue']
+      DBName: quiz
+      DBInstanceClass: db.t4g.small
+      Engine: postgres
+      EngineVersion: !Ref DatabaseEngineVersion
+      EngineLifecycleSupport: open-source-rds-extended-support-disabled
+      AllocatedStorage: '20'
+      MaxAllocatedStorage: 20
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: quizadmin
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DatabaseSubnets
+      VPCSecurityGroups: [!Ref DatabaseSecurityGroup]
+      AvailabilityZone: !Ref AppAvailabilityZone
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 0
+      CopyTagsToSnapshot: !If [IsManualReview, true, false]
+      DeleteAutomatedBackups: true
+      DeletionProtection: false
+      AutoMinorVersionUpgrade: false
+      MonitoringInterval: 0
+      EnablePerformanceInsights: false
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  RedisSubnets:
+    Type: AWS::ElastiCache::SubnetGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      CacheSubnetGroupName: !If [IsManualReview, !Sub 'gs-rehearsal-${DemoId}-redis', !Ref 'AWS::NoValue']
+      Description: Private subnets for the disposable notification cache
+      SubnetIds: [!Ref AppSubnet, !Ref SecondaryPrivateSubnet]
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  RedisAuthSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub 'gs-rehearsal-${DemoId}-redis'
+      GenerateSecretString:
+        SecretStringTemplate: '{}'
+        GenerateStringKey: token
+        PasswordLength: 48
+        ExcludePunctuation: true
+        IncludeSpace: false
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  Redis:
+    Type: AWS::ElastiCache::ReplicationGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      # 自動生成IDは専用prefixを保持しないため、作成・削除の限定IAMに一致させる。
+      ReplicationGroupId: !Sub 'gs-rehearsal-${DemoId}-redis'
+      ReplicationGroupDescription: Disposable single-node rehearsal notification cache
+      CacheNodeType: cache.t4g.small
+      Engine: redis
+      EngineVersion: '7.1'
+      CacheParameterGroupName: default.redis7
+      # CloudFormation経由では省略時に台数未指定で失敗するため、1台を明示する。
+      NumCacheClusters: 1
+      AutomaticFailoverEnabled: false
+      MultiAZEnabled: false
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: true
+      TransitEncryptionMode: required
+      AuthToken: !Sub '{{resolve:secretsmanager:${RedisAuthSecret}:SecretString:token}}'
+      CacheSubnetGroupName: !Ref RedisSubnets
+      SecurityGroupIds: [!Ref RedisSecurityGroup]
+      PreferredCacheClusterAZs: [!Ref AppAvailabilityZone]
+      Port: 6379
+      SnapshotRetentionLimit: 0
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  RuntimeSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub 'gs-rehearsal-${DemoId}-runtime'
+      GenerateSecretString:
+        SecretStringTemplate: '{}'
+        GenerateStringKey: session_secret
+        PasswordLength: 64
+        ExcludePunctuation: true
+        IncludeSpace: false
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  ApiRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: !Sub 'gs-rehearsal-${DemoId}/api'
+      ImageTagMutability: IMMUTABLE
+      EmptyOnDelete: true
+      EncryptionConfiguration: {EncryptionType: AES256}
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  GatewayRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: !Sub 'gs-rehearsal-${DemoId}/gateway'
+      ImageTagMutability: IMMUTABLE
+      EmptyOnDelete: true
+      EncryptionConfiguration: {EncryptionType: AES256}
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  ApplicationLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/gs-app-tomidaisai/rehearsal/${DemoId}'
+      RetentionInDays: 1
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  AppRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RoleName: !If [IsManualReview, !Sub 'gs-review-${DemoId}-app', !Ref 'AWS::NoValue']
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Policies:
+        - PolicyName: ReadDedicatedRehearsalInputs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ArtifactBucketName}/${DemoId}/*'
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage]
+                Resource: [!GetAtt ApiRepository.Arn, !GetAtt GatewayRepository.Arn]
+              - Effect: Allow
+                Action: [secretsmanager:GetSecretValue, secretsmanager:DescribeSecret]
+                Resource:
+                  - !Ref RedisAuthSecret
+                  - !GetAtt Database.MasterUserSecret.SecretArn
+                  - !Ref RuntimeSecret
+              - Effect: Allow
+                Action: [ec2:DescribeInstances, rds:DescribeDBInstances, elasticache:DescribeReplicationGroups]
+                Resource: '*'
+                Condition:
+                  StringEquals: {aws:RequestedRegion: !Ref 'AWS::Region'}
+              - Effect: Allow
+                Action: rds:ListTagsForResource
+                Resource: !Sub 'arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:db:${Database}'
+              - Effect: Allow
+                Action: elasticache:ListTagsForResource
+                Resource: !Sub 'arn:${AWS::Partition}:elasticache:${AWS::Region}:${AWS::AccountId}:replicationgroup:${Redis}'
+              - !If
+                - IsManualReview
+                - Effect: Allow
+                  Action: cloudformation:DescribeStackResource
+                  Resource: !Ref 'AWS::StackId'
+                - !Ref 'AWS::NoValue'
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: ap-northeast-1
+                    cloudwatch:namespace: GSQuiz/SystemHealth
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ApplicationLogGroup.Arn
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+  AppInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      InstanceProfileName: !If [IsManualReview, !Sub 'gs-review-${DemoId}-app', !Ref 'AWS::NoValue']
+      Roles: [!Ref AppRole]
+
+  AppInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: [PrivateDefaultRoute, AppRouteAssociation, AppDatabaseEgress, AppRedisEgress]
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      ImageId: !Ref UbuntuAmiId
+      InstanceType: !Ref AppInstanceType
+      IamInstanceProfile: !Ref AppInstanceProfile
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+        HttpEndpoint: enabled
+        InstanceMetadataTags: disabled
+      CreditSpecification: !If [IsBurstableApp, {CPUCredits: standard}, !Ref 'AWS::NoValue']
+      EbsOptimized: true
+      Monitoring: true
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          AssociatePublicIpAddress: false
+          DeleteOnTermination: true
+          SubnetId: !Ref AppSubnet
+          GroupSet: [!Ref AppSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeType: gp3
+            VolumeSize: 30
+      PropagateTagsToVolumeOnCreation: true
+      Tags:
+        - {Key: DemoId, Value: !Ref DemoId}
+        - {Key: Purpose, Value: quiz-rehearsal}
+
+Outputs:
+  DatabaseIdentifier:
+    Value: !Ref Database
+  RedisIdentifier:
+    Value: !Ref Redis
+  AppInstanceId:
+    Value: !Ref AppInstance
+  AppInstanceArn:
+    Value: !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${AppInstance}'
+  AppPrivateIp:
+    Value: !GetAtt AppInstance.PrivateIp
+  AppPrivateDnsName:
+    Value: !GetAtt AppInstance.PrivateDnsName
+  AppSecurityGroupId:
+    Value: !Ref AppSecurityGroup
+  VpcId:
+    Value: !Ref Vpc
+  AppSubnetId:
+    Value: !Ref AppSubnet
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+  DatabaseMasterSecretArn:
+    Value: !GetAtt Database.MasterUserSecret.SecretArn
+  RedisEndpoint:
+    Value: !GetAtt Redis.PrimaryEndPoint.Address
+  RedisAuthSecretArn:
+    Value: !Ref RedisAuthSecret
+  RuntimeSecretArn:
+    Value: !Ref RuntimeSecret
+  ApiRepositoryUri:
+    Value: !GetAtt ApiRepository.RepositoryUri
+  GatewayRepositoryUri:
+    Value: !GetAtt GatewayRepository.RepositoryUri
+  ApplicationLogGroupName:
+    Value: !Ref ApplicationLogGroup

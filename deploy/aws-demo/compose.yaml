@@ -1,0 +1,97 @@
+name: gs-app-tomidaisai-aws-demo
+
+services:
+  api:
+    image: ${AWS_DEMO_API_IMAGE:?AWS_DEMO_API_IMAGE must be pinned by digest}
+    pull_policy: never
+    env_file:
+      - path: ${AWS_DEMO_RUNTIME_ENV_FILE:?AWS_DEMO_RUNTIME_ENV_FILE must be explicit}
+        required: true
+        format: raw
+    environment:
+      AWS_DEMO_ROUND_SCOPE: single-round
+      API_INSTANCE_ID: api-single
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_POSTGRES_CA_FILE:?AWS_DEMO_POSTGRES_CA_FILE must be explicit}
+        target: /run/secrets/aws-demo-postgres-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gateway:
+    image: ${AWS_DEMO_GATEWAY_IMAGE:?AWS_DEMO_GATEWAY_IMAGE must be pinned by digest}
+    pull_policy: never
+    ports:
+      - "127.0.0.1:${AWS_DEMO_GATEWAY_PORT:?AWS_DEMO_GATEWAY_PORT must be explicit}:8080"
+    read_only: true
+    tmpfs:
+      - /config:size=4m,mode=0700
+      - /data:size=4m,mode=0700
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    # official Caddy 2.10.2 binaryのfile capabilityをNNP下でもexec可能にする最小許可。
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    stop_grace_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/api/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  preflight:
+    profiles: ["preflight"]
+    image: ${AWS_DEMO_API_IMAGE:?AWS_DEMO_API_IMAGE must be pinned by digest}
+    pull_policy: never
+    entrypoint: ["python", "-m", "quiz_app.deployment_preflight"]
+    env_file:
+      - path: ${AWS_DEMO_RUNTIME_ENV_FILE:?AWS_DEMO_RUNTIME_ENV_FILE must be explicit}
+        required: true
+        format: raw
+    environment:
+      AWS_DEMO_EXPECTED_EVENT_ID: ${AWS_DEMO_EVENT_ID:?AWS_DEMO_EVENT_ID must be explicit}
+      AWS_DEMO_ROUND_SCOPE: ${AWS_DEMO_ROUND_SCOPE:?AWS_DEMO_ROUND_SCOPE must be explicit}
+      API_INSTANCE_ID: preflight
+    volumes:
+      - type: bind
+        source: ${AWS_DEMO_POSTGRES_CA_FILE:?AWS_DEMO_POSTGRES_CA_FILE must be explicit}
+        target: /run/secrets/aws-demo-postgres-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"

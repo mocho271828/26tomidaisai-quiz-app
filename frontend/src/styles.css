@@ -1,0 +1,9 @@
+@import "./styles/tokens.css";
+@import "./styles/fonts.css";
+@import "./styles/base.css";
+@import "./styles/stages.css";
+@import "./styles/participant.css";
+@import "./styles/participant-live.css";
+@import "./styles/participant-waiting.css";
+@import "./styles/participant-results.css";
+@import "./styles/participant-awards.css";

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "title": "クイズタイトル",
+  "selected_question_ids": [1, 2, 3, 4, 5, 6, 7, 8],
+  "questions": [
+    {
+      "id": 1,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 2,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 3,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 4,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 5,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 6,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 7,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    },
+    {
+      "id": 8,
+      "respondent": "問題のカテゴリー",
+      "prompt": "問題文",
+      "options": [
+        { "label": "A", "content": "選択肢A" },
+        { "label": "B", "content": "選択肢B" },
+        { "label": "C", "content": "選択肢C" },
+        { "label": "D", "content": "選択肢D" }
+      ],
+      "correct_label": "A"
+    }
+  ]
+}

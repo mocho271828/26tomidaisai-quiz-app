@@ -1,0 +1,36 @@
+{
+  "inputs": {
+    "run_id": "11111111-1111-4111-8111-111111111111",
+    "event_id": "22222222-2222-4222-8222-222222222222",
+    "event_slug": "load-test-2026-09-03",
+    "scheduled_start_at": "2026-09-03T01:00:00Z",
+    "public_origin": "https://quiz.aws.internal",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "api_image": "registry.aws.internal/quiz/api@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "gateway_image": "registry.aws.internal/quiz/gateway@sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "generator_image": "registry.aws.internal/quiz/generator@sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "scoring_policy_version": "scoring-v1",
+    "scoring_base_points": 10000,
+    "scoring_initial_speed_bonus": 500,
+    "scoring_speed_bucket_ms": 100,
+    "scoring_speed_decrement_per_bucket": 10,
+    "scoring_standard_duration_ms": 10000,
+    "scoring_is_approved": true,
+    "display_name_policy_version": "display-v1",
+    "display_notice_version": "notice-v1",
+    "display_max_code_points": 20,
+    "display_reject_patterns_json": "[]",
+    "created_at": "2026-09-03T00:00:00Z"
+  },
+  "expected": {
+    "manifest_sha256": "ffff132c132bb451e3563cfb47102f26fca37a4af1172bcdad0cdf4c033cfb45",
+    "scenario_sha256": "a204a1d2e249209ba457493e98250ea4da0a8eb088643aa8fb10efcaad7ea070",
+    "feff_title_manifest_sha256": "2657e93c2b8642232d265cbd3fc78e6718f91c4157990ccdee7f07db4ada7980",
+    "information_separator_title_manifest_sha256": "52f0b5673b206c18735e25be4208cb870f96cbb9b8c06d780a24a0962bfe0798",
+    "uuid5": {
+      "question1": "91b30112-660f-5b70-8457-d126a16b2810",
+      "question1_option_a": "7c068f79-a713-5d88-9e03-23f0a1e09e30",
+      "round1": "314d06c7-1afc-5f43-9a04-63b456ecdc4a"
+    }
+  }
+}

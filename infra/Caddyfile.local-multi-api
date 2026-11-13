@@ -1,0 +1,50 @@
+{
+	auto_https off
+	admin off
+}
+:8080 {
+	encode zstd gzip
+
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000 api-secondary:8000 {
+			transport http {
+				# Uvicornの5秒idleより先に接続を回収し、回答POSTの切断502を防ぐ。
+				keepalive 2s
+			}
+			lb_policy least_conn
+			# 依存先や結果workerの不調だけで全HTTP経路を閉じず、readinessは別途確認する。
+			health_uri /api/health/live
+			health_interval 2s
+			health_timeout 1s
+			health_fails 3
+			health_passes 2
+			fail_duration 2s
+			max_fails 5
+			lb_try_duration 1s
+			lb_try_interval 100ms
+			# 送信後の失敗で回答・運営POSTを別APIへ再実行しない。
+			lb_retry_match method GET
+		}
+	}
+
+	@spa_entrypoints path / /operator /operator/ /moderator /moderator/
+	handle @spa_entrypoints {
+		root * /srv
+		rewrite * /index.html
+		file_server
+	}
+
+	handle /assets/* {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		respond 404
+	}
+}

@@ -1,0 +1,23 @@
+# HTTP: compose.yaml + 本file。TLSでは続けてcompose.local-tls.yamlと
+# compose.local-tls-multi-api.yamlを指定する。schema/seedは適用しない。
+services:
+  api:
+    # 同じproject内で一度buildしたartifactを2つのAPIへ配置する。
+    image: ${COMPOSE_PROJECT_NAME:-gs-app-tomidaisai}-api
+    environment:
+      API_INSTANCE_ID: api-local-primary
+
+  api-secondary:
+    image: ${COMPOSE_PROJECT_NAME:-gs-app-tomidaisai}-api
+    extends:
+      file: compose.yaml
+      service: api
+    environment:
+      API_INSTANCE_ID: api-local-secondary
+
+  gateway:
+    volumes:
+      - ./infra/Caddyfile.local-multi-api:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api-secondary:
+        condition: service_healthy

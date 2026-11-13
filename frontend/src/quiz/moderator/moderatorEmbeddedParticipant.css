@@ -1,0 +1,53 @@
+/* 同じ参加者画面のまま、司会の細長い枠では装飾と余白を先に縮める。 */
+@media (max-height: 500px) {
+  .moderator-embedded-participant .participant-header { min-height: 44px; padding-inline: 8px; }
+  .moderator-embedded-participant .participant-question { padding: 2px 8px 4px; }
+  .moderator-embedded-participant .participant-question-prompt { margin: 4px 0 6px; font-size: 14px; line-height: 1.35; }
+  .moderator-embedded-participant .participant-round-header { height: 28px; }
+  .moderator-embedded-participant .participant-round-header .tommy-mascot { width: 30px; height: 28px; }
+  .moderator-embedded-participant .participant-timer-card { margin-bottom: 6px; }
+  .moderator-embedded-participant .participant-live-shell .countdown strong { font-size: 26px; }
+  .moderator-embedded-participant .participant-live-shell .answer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(48px, auto); gap: 6px; }
+  .moderator-embedded-participant .participant-live-shell .answer-button { height: 100%; min-height: 48px; padding: 4px; gap: 4px; grid-template-columns: 20px minmax(0, 1fr); font-size: 12px; }
+  .moderator-embedded-participant .participant-live-shell .answer-label { width: 20px; height: 24px; font-size: 12px; }
+  .moderator-embedded-participant .participant-live-shell .answer-state { grid-column: 1 / -1; }
+  .moderator-embedded-participant .participant-answer-hint { margin-top: 6px; font-size: 11px; }
+  .moderator-embedded-participant .participant-award-stage { padding: 8px; }
+  .moderator-embedded-participant .participant-award-table { margin-top: 6px; font-size: 14px; }
+  .moderator-embedded-participant .participant-award-table th,
+  .moderator-embedded-participant .participant-award-table td { padding: 4px 8px; }
+  .moderator-embedded-participant .participant-award-pagination { margin-top: 6px; }
+}
+@media (max-width: 240px) {
+  .moderator-embedded-participant .participant-header { gap: 4px; }
+  .moderator-embedded-participant .participant-header-id span { font-size: 10px; }
+  .moderator-embedded-participant .participant-header-id strong { font-size: 16px; }
+  .moderator-embedded-participant .participant-question { padding: 2px 6px 4px; }
+  .moderator-embedded-participant .participant-question-prompt { margin: 2px 0 4px; font-size: 12px; line-height: 1.3; }
+  .moderator-embedded-participant .participant-round-header { height: 24px; }
+  .moderator-embedded-participant .participant-round-header .tommy-mascot { width: 26px; height: 24px; }
+  .moderator-embedded-participant .participant-round-badge { min-height: 20px; font-size: 10px; }
+  .moderator-embedded-participant .participant-timer-card { margin-bottom: 4px; }
+  .moderator-embedded-participant .participant-timer-values { gap: 2px; font-size: 10px; }
+  .moderator-embedded-participant .participant-timer-label { white-space: nowrap; }
+  .moderator-embedded-participant .participant-live-shell .countdown strong { font-size: 22px; }
+  .moderator-embedded-participant .participant-live-shell .countdown span { font-size: 10px; }
+  .moderator-embedded-participant .participant-live-shell .answer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  .moderator-embedded-participant .participant-live-shell .answer-button { height: auto; min-height: 48px; padding: 4px; gap: 3px; grid-template-columns: 16px minmax(0, 1fr); font-size: 11px; line-height: 1.2; }
+  .moderator-embedded-participant .participant-live-shell .answer-label { width: 16px; height: 20px; font-size: 10px; }
+  .moderator-embedded-participant .participant-live-shell .answer-state { grid-column: 1 / -1; }
+  .moderator-embedded-participant .participant-answer-hint { margin-top: 4px; font-size: 10px; }
+  .moderator-embedded-participant .participant-award-stage h2 { font-size: 18px; }
+  .moderator-embedded-participant .participant-award-table { font-size: 12px; }
+  .moderator-embedded-participant .participant-award-table th,
+  .moderator-embedded-participant .participant-award-table td { padding-block: 2px; }
+}
+@media (max-height: 500px) {
+  .moderator-embedded-participant .participant-finished-stage { padding: 8px; }
+  .moderator-embedded-participant .participant-finished-stage > h2 { font-size: 18px; margin-bottom: 4px; }
+  .moderator-embedded-participant .participant-finished-mascot { flex: 1; min-height: 0; margin-top: 4px; }
+  .moderator-embedded-participant .participant-finished-mascot .tommy-mascot { max-height: 100%; width: 64px; }
+  .moderator-embedded-participant .participant-finished-message { font-size: 11px; margin-top: 4px; }
+  .moderator-embedded-participant .participant-finished-actions { flex: 0 0 auto; gap: 4px; padding-top: 4px; }
+  .moderator-embedded-participant .participant-finished-actions a { min-height: 44px; padding-inline: 6px; font-size: 11px; }
+}

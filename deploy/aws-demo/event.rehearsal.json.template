@@ -1,0 +1,7 @@
+{
+  "event_id": "<new-uuid4>",
+  "title": "クイズアプリタイトル",
+  "slug": "quiz-rehearsal",
+  "scoring_policy_version": "<approved-scoring-policy-version>",
+  "display_name_policy_version": "<prepared-display-policy-version>"
+}

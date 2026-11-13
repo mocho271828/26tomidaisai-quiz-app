@@ -1,0 +1,9 @@
+/* 本文の書体。見出し（りょうゴシック PlusN）と数字（DIN 2014）は index.html の
+   Adobe Fonts キットで読み込み、届かないときは tokens.css の後ろの書体で表示する。 */
+@font-face {
+  font-family: "Noto Sans JP";
+  src: url("../assets/fonts/NotoSansJP-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}

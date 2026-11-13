@@ -1,0 +1,6 @@
+# CloudFront VPC originに渡したEC2自身のprivate IPv4だけを指定する。
+# baseのloopback bindを残し、APIや管理portは公開しない。
+services:
+  gateway:
+    ports:
+      - "${REHEARSAL_PRIVATE_IPV4:?EC2 private IPv4 is required}:${AWS_DEMO_GATEWAY_PORT:?AWS_DEMO_GATEWAY_PORT is required}:8080"

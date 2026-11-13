@@ -1,0 +1,61 @@
+.tommy-mascot {
+  display: inline-block;
+  flex: 0 0 auto;
+  aspect-ratio: 1;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  vertical-align: middle;
+}
+
+.tommy-mascot--small {
+  width: 4rem;
+}
+
+.tommy-mascot--medium {
+  width: 7rem;
+}
+
+.tommy-mascot--large {
+  width: 11rem;
+}
+
+.tommy-mascot--idle {
+  background-image: url("../assets/characters/tommy-idle.webp");
+}
+
+.tommy-mascot--waiting {
+  background-image: url("../assets/characters/tommy-waiting.webp");
+}
+
+.tommy-mascot--thinking {
+  background-image: url("../assets/characters/tommy-thinking.webp");
+}
+
+.tommy-mascot--celebrating {
+  background-image: url("../assets/characters/tommy-celebrating.webp");
+}
+
+.tommy-mascot--surprised {
+  background-image: url("../assets/characters/tommy-surprised.webp");
+}
+
+.tommy-mascot--greeting {
+  background-image: url("../assets/characters/tommy-greeting.webp");
+}
+
+.tommy-mascot--running {
+  background-image: url("../assets/characters/tommy-running.webp");
+}
+
+.tommy-mascot--hurrying {
+  background-image: url("../assets/characters/tommy-hurrying.webp");
+}
+
+.tommy-mascot--applauding {
+  background-image: url("../assets/characters/tommy-applauding.webp");
+}
+
+.tommy-mascot--smirking {
+  background-image: url("../assets/characters/tommy-smirking.webp");
+}

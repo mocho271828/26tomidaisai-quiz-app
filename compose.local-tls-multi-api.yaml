@@ -1,0 +1,26 @@
+# compose.yaml + compose.local-multi-api.yaml + compose.local-tls.yaml + 本file。
+# extendsは合成前のcompose.yamlを参照するため、secondaryにもTLS境界を適用する。
+services:
+  api-secondary:
+    entrypoint: ["sh", "/opt/local-tls/api-start.sh"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://quiz:${POSTGRES_PASSWORD:?local DB credential required}@postgres:5432/quiz_demo
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/local-ca/ca.crt
+      REDIS_URL: rediss://:${LOCAL_TLS_REDIS_PASSWORD:?}@redis:6379/0
+      SSL_CERT_FILE: /run/quiz-tls/system-plus-local-ca.pem
+      SESSION_COOKIE_SECURE: "true"
+      REALTIME_ALLOWED_ORIGINS: ${LOCAL_TLS_ALLOWED_ORIGINS:?exact HTTPS origins required}
+      ENABLE_DEMO_SEED: "false"
+    volumes:
+      - ${LOCAL_TLS_CERT_DIRECTORY:?}/ca.crt:/run/local-ca/ca.crt:ro
+      - ./infra/local-tls/api-start.sh:/opt/local-tls/api-start.sh:ro
+    tmpfs:
+      - /run/quiz-tls
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  gateway:
+    volumes:
+      - ./infra/local-tls/Caddyfile.multi-api:/etc/caddy/Caddyfile:ro
